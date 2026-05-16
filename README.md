@@ -1,4 +1,4 @@
-# Group Monorepo — Kanban Board MVP
+# Project Flowboard — Kanban-style Board MVP
 
 A group project monorepo: React + Vite frontend, Express + Drizzle ORM backend, PostgreSQL database.
 
