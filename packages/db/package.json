@@ -1,0 +1,25 @@
+{
+  "name": "@group/db",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "generate": "drizzle-kit generate",
+    "migrate": "drizzle-kit migrate",
+    "studio": "drizzle-kit studio",
+    "lint": "eslint . --ext .ts"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.30.0",
+    "pg": "^8.11.0",
+    "dotenv": "^16.4.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.0",
+    "drizzle-kit": "^0.21.0",
+    "typescript": "^5.4.0"
+  }
+}
