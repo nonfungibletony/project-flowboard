@@ -1,0 +1,56 @@
+name: Feature Request
+description: Suggest a new feature or enhancement
+title: "feat: "
+labels: ["feature"]
+body:
+  - type: textarea
+    id: user-story
+    attributes:
+      label: User Story
+      description: Describe the feature from a user perspective
+      placeholder: "As a user, I want ... so that ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: What must be true for this to be "done"?
+      placeholder: |
+        - [ ] Criterion 1
+        - [ ] Criterion 2
+    validations:
+      required: true
+
+  - type: textarea
+    id: technical
+    attributes:
+      label: Technical Notes
+      description: Implementation hints, API changes, packages needed
+      placeholder: "- Use @hello-pangea/dnd for drag and drop..."
+
+  - type: dropdown
+    id: effort
+    attributes:
+      label: Effort Estimate
+      options:
+        - Small (few hours)
+        - Medium (1-2 days)
+        - Large (3+ days)
+    validations:
+      required: true
+
+  - type: input
+    id: blocked
+    attributes:
+      label: Blocked by
+      description: Issue numbers this depends on
+      placeholder: "#1, #2"
+
+  - type: input
+    id: blocks
+    attributes:
+      label: Blocks
+      description: Issue numbers waiting on this
+      placeholder: "#3, #4"
