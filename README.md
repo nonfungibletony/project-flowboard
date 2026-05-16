@@ -5,7 +5,7 @@ A group project monorepo: React + Vite frontend, Express + Drizzle ORM backend, 
 ## Architecture
 
 ```
-group-monorepo/
+project-flowboard/
 ├── apps/
 │   ├── web/          # React + Vite frontend (port 3000)
 │   └── api/          # Express + TypeScript backend (port 4000)
