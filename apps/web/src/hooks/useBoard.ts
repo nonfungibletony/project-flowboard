@@ -4,10 +4,9 @@ import type { Board } from '@group/shared'
 export function useBoard(boardId: string) {
   const [board, setBoard] = useState<Board | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-
   useEffect(() => {
     if (!boardId) return
-    fetch(`/boards/${boardId}`)
+    fetch(`/api/boards/${boardId}`)
       .then((r) => r.json())
       .then((data) => {
         setBoard(data.data || null)

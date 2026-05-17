@@ -4,10 +4,9 @@ import type { Column as ColumnType, Card } from '@group/shared'
 interface Props {
   column: ColumnType
   onAddCard: (title: string) => void
-  onMoveCard: (cardId: string, targetColumnId: string) => void
 }
 
-export function Column({ column, onAddCard, onMoveCard }: Props) {
+export function Column({ column, onAddCard }: Props) {
   const [showAdd, setShowAdd] = useState(false)
   const [newCardTitle, setNewCardTitle] = useState('')
 

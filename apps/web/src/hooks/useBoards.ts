@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react'
 import type { Board } from '@group/shared'
-
-const API_URL = '' // Uses Vite proxy
+import { useAuth } from '@clerk/clerk-react'
 
 export function useBoards() {
   const [boards, setBoards] = useState<Board[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const { getToken } = useAuth()
 
   useEffect(() => {
-    fetch(`${API_URL}/boards`)
+    fetch(`/api/boards`)
       .then((r) => r.json())
       .then((data) => {
         setBoards(data.data || [])
@@ -18,9 +18,13 @@ export function useBoards() {
   }, [])
 
   const createBoard = async (name: string, description?: string) => {
-    const res = await fetch(`${API_URL}/boards`, {
+    const token = await getToken()
+    const res = await fetch(`/api/boards`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
       body: JSON.stringify({ name, description }),
     })
     const data = await res.json()

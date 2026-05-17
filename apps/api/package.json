@@ -2,6 +2,7 @@
   "name": "@group/api",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
@@ -9,18 +10,20 @@
     "lint": "eslint . --ext .ts"
   },
   "dependencies": {
-    "express": "^4.19.0",
+    "@clerk/backend": "^3.4.9",
+    "@group/db": "workspace:*",
+    "@group/shared": "workspace:*",
     "cors": "^2.8.5",
     "dotenv": "^16.4.0",
-    "zod": "^3.23.0",
-    "@group/shared": "workspace:*",
-    "@group/db": "workspace:*"
+    "drizzle-orm": "^0.30.0",
+    "express": "^4.19.0",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
-    "@types/express": "^4.17.21",
     "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
     "@types/node": "^20.0.0",
-    "typescript": "^5.4.0",
-    "tsx": "^4.7.0"
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
   }
 }

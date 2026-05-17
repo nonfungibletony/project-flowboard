@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { CreateBoardSchema, UpdateBoardSchema, CreateColumnSchema, CreateCardSchema, UpdateCardSchema, CreateCommentSchema } from "@group/shared";
 import { db, schema } from "@group/db";
 import { eq } from "drizzle-orm";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -11,14 +12,14 @@ router.get("/", async (_req: Request, res: Response) => {
   res.json({ success: true, data: boards });
 });
 
-router.post("/", async (req: Request, res: Response) => {
+router.post("/", requireAuth, async (req: Request, res: Response) => {
   const parsed = CreateBoardSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ success: false, message: parsed.error.message });
   }
   const inserted = await db.insert(schema.boards).values({
     ...parsed.data,
-    createdBy: req.body.createdBy || "00000000-0000-0000-0000-000000000000", // placeholder until auth
+    createdBy: req.user!.id,
   }).returning();
   res.status(201).json({ success: true, data: inserted[0] });
 });
@@ -29,7 +30,7 @@ router.get("/:id", async (req: Request, res: Response) => {
   res.json({ success: true, data: board[0] });
 });
 
-router.patch("/:id", async (req: Request, res: Response) => {
+router.patch("/:id", requireAuth, async (req: Request, res: Response) => {
   const parsed = UpdateBoardSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ success: false, message: parsed.error.message });
@@ -38,7 +39,7 @@ router.patch("/:id", async (req: Request, res: Response) => {
   res.json({ success: true, data: updated[0] });
 });
 
-router.delete("/:id", async (req: Request, res: Response) => {
+router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
   await db.delete(schema.boards).where(eq(schema.boards.id, req.params.id));
   res.json({ success: true });
 });
@@ -55,7 +56,7 @@ router.get("/:id/columns", async (req: Request, res: Response) => {
   res.json({ success: true, data: colsWithCards });
 });
 
-router.post("/:id/columns", async (req: Request, res: Response) => {
+router.post("/:id/columns", requireAuth, async (req: Request, res: Response) => {
   const parsed = CreateColumnSchema.safeParse({ ...req.body, boardId: req.params.id });
   if (!parsed.success) {
     return res.status(400).json({ success: false, message: parsed.error.message });
@@ -65,7 +66,7 @@ router.post("/:id/columns", async (req: Request, res: Response) => {
 });
 
 // Card routes via column
-router.post("/columns/:columnId/cards", async (req: Request, res: Response) => {
+router.post("/columns/:columnId/cards", requireAuth, async (req: Request, res: Response) => {
   const parsed = CreateCardSchema.safeParse({ ...req.body, columnId: req.params.columnId });
   if (!parsed.success) {
     return res.status(400).json({ success: false, message: parsed.error.message });
@@ -74,14 +75,14 @@ router.post("/columns/:columnId/cards", async (req: Request, res: Response) => {
   res.status(201).json({ success: true, data: inserted[0] });
 });
 
-router.patch("/cards/:cardId/move", async (req: Request, res: Response) => {
+router.patch("/cards/:cardId/move", requireAuth, async (req: Request, res: Response) => {
   const { columnId } = req.body;
   if (!columnId) return res.status(400).json({ success: false, message: "columnId required" });
   const updated = await db.update(schema.cards).set({ columnId }).where(eq(schema.cards.id, req.params.cardId)).returning();
   res.json({ success: true, data: updated[0] });
 });
 
-router.patch("/cards/:cardId", async (req: Request, res: Response) => {
+router.patch("/cards/:cardId", requireAuth, async (req: Request, res: Response) => {
   const parsed = UpdateCardSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ success: false, message: parsed.error.message });
@@ -96,11 +97,11 @@ router.get("/cards/:cardId/comments", async (req: Request, res: Response) => {
   res.json({ success: true, data: comments });
 });
 
-router.post("/cards/:cardId/comments", async (req: Request, res: Response) => {
+router.post("/cards/:cardId/comments", requireAuth, async (req: Request, res: Response) => {
   const parsed = CreateCommentSchema.safeParse({
     ...req.body,
     cardId: req.params.cardId,
-    userId: req.body.userId || "00000000-0000-0000-0000-000000000000", // placeholder until auth
+    userId: req.user!.id,
   });
   if (!parsed.success) {
     return res.status(400).json({ success: false, message: parsed.error.message });

@@ -10,10 +10,12 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
+    "@clerk/clerk-react": "^5.0.0",
+    "@group/shared": "workspace:*",
+    "drizzle-orm": "^0.30.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "react-router-dom": "^6.23.0",
-    "@group/shared": "workspace:*",
     "zod": "^3.23.0"
   },
   "devDependencies": {

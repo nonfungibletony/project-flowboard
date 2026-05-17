@@ -6,7 +6,7 @@ import { useColumns } from '../hooks/useColumns'
 export function Board() {
   const { boardId } = useParams()
   const { board, isLoading: boardLoading } = useBoard(boardId!)
-  const { columns, isLoading: columnsLoading, createColumn, createCard, moveCard } = useColumns(boardId!)
+  const { columns, isLoading: columnsLoading, createColumn, createCard } = useColumns(boardId!)
 
   if (boardLoading || columnsLoading) return <p>Loading...</p>
 
@@ -23,7 +23,6 @@ export function Board() {
             key={column.id}
             column={column}
             onAddCard={(title) => createCard(column.id, title)}
-            onMoveCard={(cardId, targetColumnId) => moveCard(cardId, targetColumnId)}
           />
         ))}
         <button className="add-column-btn" onClick={() => {
