@@ -36,6 +36,22 @@ Open:
 - API: http://localhost:4000
 - API Health: http://localhost:4000/health
 
+## Clerk Authentication Setup
+
+1. Create an account at https://clerk.com
+2. Create a new application
+3. Copy your **Publishable key** to `apps/web/.env`:
+   ```
+   VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
+   ```
+4. Copy your **Secret key** to `apps/api/.env`:
+   ```
+   CLERK_SECRET_KEY=sk_test_...
+   ```
+5. (Optional) In Clerk Dashboard → JWT Templates, create a template with `email` and `name` claims if you want richer user data.
+
+No additional backend webhook configuration is needed for the MVP — users are synced to the local PostgreSQL `users` table on their first authenticated request.
+
 ## Workspace Commands
 
 | Command | Runs where | Description |

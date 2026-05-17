@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import { HealthCheckSchema } from "@group/shared";
 import { boardRoutes } from "./routes/boards.js";
 import { userRoutes } from "./routes/users.js";
+import { requireAuth } from "./middleware/auth.js";
 
 dotenv.config();
 
@@ -20,6 +21,10 @@ app.get("/health", (_req: Request, res: Response) => {
     timestamp: new Date().toISOString(),
   });
   res.json({ success: true, data: check });
+});
+
+app.get("/me", requireAuth, (req: Request, res: Response) => {
+  res.json({ success: true, data: req.user });
 });
 
 app.use("/users", userRoutes);

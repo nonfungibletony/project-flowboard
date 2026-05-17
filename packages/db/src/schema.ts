@@ -2,6 +2,7 @@ import { serial, uuid, varchar, timestamp, pgTable, integer, text, foreignKey } 
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
+  clerkUserId: varchar("clerk_user_id", { length: 255 }).notNull().unique(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   name: varchar("name", { length: 100 }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
