@@ -1,30 +1,26 @@
 import { useState, useEffect } from 'react'
 import type { Board } from '@group/shared'
-import { useAuth } from '@clerk/clerk-react'
+import { useAuthFetch } from './useAuth'
 
 export function useBoards() {
   const [boards, setBoards] = useState<Board[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const { getToken } = useAuth()
+  const authFetch = useAuthFetch()
 
   useEffect(() => {
-    fetch(`/api/boards`)
+    authFetch(`/api/boards`)
       .then((r) => r.json())
       .then((data) => {
         setBoards(data.data || [])
         setIsLoading(false)
       })
       .catch(() => setIsLoading(false))
-  }, [])
+  }, [authFetch])
 
   const createBoard = async (name: string, description?: string) => {
-    const token = await getToken()
-    const res = await fetch(`/api/boards`, {
+    const res = await authFetch(`/api/boards`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, description }),
     })
     const data = await res.json()

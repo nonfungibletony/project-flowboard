@@ -1,31 +1,27 @@
 import { useState, useEffect } from 'react'
 import type { Column } from '@group/shared'
-import { useAuth } from '@clerk/clerk-react'
+import { useAuthFetch } from './useAuth'
 
 export function useColumns(boardId: string) {
   const [columns, setColumns] = useState<Column[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const { getToken } = useAuth()
+  const authFetch = useAuthFetch()
 
   useEffect(() => {
     if (!boardId) return
-    fetch(`/api/boards/${boardId}/columns`)
+    authFetch(`/api/boards/${boardId}/columns`)
       .then((r) => r.json())
       .then((data) => {
         setColumns(data.data || [])
         setIsLoading(false)
       })
       .catch(() => setIsLoading(false))
-  }, [boardId])
+  }, [authFetch, boardId])
 
   const createColumn = async (name: string) => {
-    const token = await getToken()
-    const res = await fetch(`/api/boards/${boardId}/columns`, {
+    const res = await authFetch(`/api/boards/${boardId}/columns`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
     })
     const data = await res.json()
@@ -35,13 +31,9 @@ export function useColumns(boardId: string) {
   }
 
   const createCard = async (columnId: string, title: string) => {
-    const token = await getToken()
-    const res = await fetch(`/api/boards/columns/${columnId}/cards`, {
+    const res = await authFetch(`/api/boards/columns/${columnId}/cards`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title }),
     })
     const data = await res.json()
