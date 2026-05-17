@@ -32,7 +32,7 @@ pnpm dev
 ```
 
 Open:
-- Frontend: http://localhost:3000
+- Frontend: http://localhost:3002
 - API: http://localhost:4000
 - API Health: http://localhost:4000/health
 
