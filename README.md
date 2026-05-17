@@ -7,7 +7,7 @@ A group project monorepo: React + Vite frontend, Express + Drizzle ORM backend, 
 ```
 project-flowboard/
 ├── apps/
-│   ├── web/          # React + Vite frontend (port 3000)
+│   ├── web/          # React + Vite frontend (port 3002)
 │   └── api/          # Express + TypeScript backend (port 4000)
 ├── packages/
 │   ├── shared/       # Zod schemas + shared types
@@ -54,7 +54,7 @@ pnpm db:migrate
 pnpm dev
 ```
 
-- Frontend: http://localhost:3000
+- Frontend: http://localhost:3002
 - API: http://localhost:4000
 - Health check: http://localhost:4000/health
 
