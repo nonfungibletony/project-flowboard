@@ -60,7 +60,7 @@ pnpm dev
 
 ## User Stories (MVP)
 
-- ✅ Sign up and log in (placeholder, auth TBD)
+- ✅ Sign up and log in (Clerk auth — see #1)
 - ✅ Create a board
 - ✅ Create columns in a board
 - ✅ Create cards in a column
@@ -92,9 +92,10 @@ pnpm dev
 | PATCH | `/cards/:id` | Edit card |
 | GET/POST | `/cards/:id/comments` | List / add comments |
 
-## Next Steps
+## Post-MVP (see GitHub Issues)
 
-- [ ] Add Clerk/Auth.js authentication
+- [ ] Add logout UI/UX button ([#11](https://github.com/nonfungibletony/project-flowboard/issues/11))
+- [ ] Evaluate httpOnly cookie session architecture ([#12](https://github.com/nonfungibletony/project-flowboard/issues/12))
 - [ ] Implement drag-and-drop (react-beautiful-dnd or @dnd-kit)
 - [ ] Add card detail modal with comments
 - [ ] Real-time updates (WebSockets or SSE)
