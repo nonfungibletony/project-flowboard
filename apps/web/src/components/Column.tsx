@@ -5,9 +5,10 @@ import type { Column as ColumnType, Card } from '@group/shared'
 interface Props {
   column: ColumnType
   onAddCard: (title: string) => Promise<unknown>
+  onCardClick: (card: Card) => void
 }
 
-export function Column({ column, onAddCard }: Props) {
+export function Column({ column, onAddCard, onCardClick }: Props) {
   const [showAdd, setShowAdd] = useState(false)
   const [newCardTitle, setNewCardTitle] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -53,6 +54,7 @@ export function Column({ column, onAddCard }: Props) {
                     ref={dragProvided.innerRef}
                     {...dragProvided.draggableProps}
                     {...dragProvided.dragHandleProps}
+                    onClick={() => onCardClick(card)}
                   >
                     <div className="card-title">{card.title}</div>
                     <div className="card-meta">

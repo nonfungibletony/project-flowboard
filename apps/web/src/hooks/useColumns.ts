@@ -102,6 +102,70 @@ export function useColumns(boardId: string) {
     return card
   }
 
+  const updateCard = async (cardId: string, updates: { title?: string; description?: string }) => {
+    const previousColumns = columns
+
+    setColumns((prev) =>
+      prev.map((col) => ({
+        ...col,
+        cards: (col.cards || []).map((card) =>
+          card.id === cardId
+            ? { ...card, ...updates, updatedAt: new Date().toISOString() }
+            : card
+        ),
+      }))
+    )
+
+    const res = await authFetch(`/api/boards/cards/${cardId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    })
+    const data = await res.json()
+
+    if (!res.ok || !data.success) {
+      setColumns(previousColumns)
+      throw new Error(data.message || 'Unable to update card')
+    }
+
+    const saved = normalizeCard({ ...data.data, comments: [] } as Card)
+    setColumns((prev) =>
+      prev.map((col) => ({
+        ...col,
+        cards: sortCards(
+          (col.cards || []).map((card) => (card.id === cardId ? { ...saved, comments: card.comments || [] } : card))
+        ),
+      }))
+    )
+    return saved
+  }
+
+  const addComment = async (cardId: string, content: string) => {
+    const res = await authFetch(`/api/boards/cards/${cardId}/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    })
+    const data = await res.json()
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Unable to add comment')
+    }
+
+    const comment = data.data
+    setColumns((prev) =>
+      prev.map((col) => ({
+        ...col,
+        cards: (col.cards || []).map((card) =>
+          card.id === cardId
+            ? { ...card, comments: [...(card.comments || []), comment] }
+            : card
+        ),
+      }))
+    )
+    return comment
+  }
+
   const moveCard = async (cardId: string, sourceColumnId: string, targetColumnId: string, targetIndex: number) => {
     setError(null)
 
@@ -146,7 +210,7 @@ export function useColumns(boardId: string) {
     )
   }
 
-  return { columns, isLoading, error, createColumn, createCard, moveCard }
+  return { columns, isLoading, error, createColumn, createCard, updateCard, addComment, moveCard }
 }
 
 function sortColumns(columns: Column[]) {
