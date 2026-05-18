@@ -33,23 +33,34 @@ project-flowboard/
 - Node.js 20+
 - pnpm 9+
 - Docker (for PostgreSQL)
+- A free [Clerk](https://clerk.com/) account for authentication
 
 ### 1. Install dependencies
 ```bash
 pnpm install
 ```
 
-### 2. Start PostgreSQL
+### 2. Configure environment variables
+```bash
+# Frontend
+cp apps/web/.env.example apps/web/.env
+# Backend
+cp apps/api/.env.example apps/api/.env
+```
+
+Edit both `.env` files and fill in your Clerk API keys. See [`SETUP.md`](./SETUP.md) for a step-by-step guide on creating a Clerk application.
+
+### 3. Start PostgreSQL
 ```bash
 docker-compose up -d
 ```
 
-### 3. Run database migrations
+### 4. Run database migrations
 ```bash
 pnpm db:migrate
 ```
 
-### 4. Start dev servers
+### 5. Start dev servers
 ```bash
 pnpm dev
 ```
