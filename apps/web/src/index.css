@@ -253,9 +253,22 @@ body {
   transition: transform 0.15s;
 }
 
+.card:active {
+  cursor: grabbing;
+}
+
 .card:hover {
   transform: translateY(-1px);
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.card-dragging {
+  box-shadow: 0 8px 18px rgba(0,0,0,0.18);
+  transform: rotate(1deg);
+}
+
+.column-cards-over {
+  background: #d1d5db;
 }
 
 .card-title {
