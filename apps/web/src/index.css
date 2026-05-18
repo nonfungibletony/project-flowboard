@@ -359,6 +359,14 @@ body {
   align-items: flex-start;
 }
 
+.column-wrapper {
+  flex: 0 0 280px;
+}
+
+.column-wrapper-dragging {
+  transform: rotate(1deg);
+}
+
 .column {
   min-width: 280px;
   max-width: 280px;
@@ -382,6 +390,14 @@ body {
   font-size: 0.9rem;
   font-weight: 600;
   color: #374151;
+}
+
+.column-header-draggable {
+  cursor: grab;
+}
+
+.column-header-draggable:active {
+  cursor: grabbing;
 }
 
 .column-cards {

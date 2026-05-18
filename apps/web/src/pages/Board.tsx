@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
+import { DragDropContext, Draggable, Droppable, type DropResult } from '@hello-pangea/dnd'
 import { useParams } from 'react-router-dom'
 import type { Card, Column as ColumnType } from '@group/shared'
 import { Column } from '../components/Column'
@@ -23,7 +23,7 @@ export function Board() {
   const [dueFrom, setDueFrom] = useState('')
   const [dueTo, setDueTo] = useState('')
   const { board, members, isLoading: boardLoading, error: boardError, inviteMember, removeMember } = useBoard(boardId!)
-  const { columns, labels, isLoading: columnsLoading, error, createColumn, createCard, moveCard, deleteCard, createLabel, setCardLabels, setCardDueDate, getCardAttachments, uploadCardAttachment, deleteCardAttachment } = useColumns(boardId!)
+  const { columns, labels, isLoading: columnsLoading, error, createColumn, createCard, moveCard, reorderColumns, deleteCard, createLabel, setCardLabels, setCardDueDate, getCardAttachments, uploadCardAttachment, deleteCardAttachment } = useColumns(boardId!)
 
   const canEdit = board?.role === 'owner' || board?.role === 'editor'
   const isOwner = board?.role === 'owner'
@@ -55,16 +55,22 @@ export function Board() {
 
   const handleDragEnd = async (result: DropResult) => {
     if (!canEdit) return
-    const { destination, draggableId, source } = result
+    const { destination, draggableId, source, type } = result
     if (!destination) return
     if (destination.droppableId === source.droppableId && destination.index === source.index) return
 
     setMoveError(null)
 
     try {
+      if (type === 'COLUMN') {
+        if (hasFilters) return
+        await reorderColumns(source.index, destination.index)
+        return
+      }
+
       await moveCard(draggableId, source.droppableId, destination.droppableId, destination.index)
     } catch (err) {
-      setMoveError(err instanceof Error ? err.message : 'Unable to move card')
+      setMoveError(err instanceof Error ? err.message : 'Unable to move item')
     }
   }
 
@@ -189,68 +195,83 @@ export function Board() {
       </div>
 
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="columns">
-          {filteredColumns.map((column) => (
-            <Column
-              key={column.id}
-              column={column}
-              labels={labels}
-              canEdit={canEdit}
-              canDrag={canEdit && !hasFilters}
-              searchTerm={searchTerm}
-              onAddCard={(title) => createCard(column.id, title)}
-              onDeleteCard={(cardId) => deleteCard(cardId, column.id)}
-              onCreateLabel={createLabel}
-              onSetCardLabels={(cardId, labelIds) => setCardLabels(cardId, column.id, labelIds)}
-              onSetCardDueDate={(cardId, dueDate) => setCardDueDate(cardId, column.id, dueDate)}
-              onGetCardAttachments={(cardId) => getCardAttachments(cardId, column.id)}
-              onUploadCardAttachment={(cardId, file) => uploadCardAttachment(cardId, column.id, file)}
-              onDeleteCardAttachment={(cardId, attachmentId) => deleteCardAttachment(cardId, column.id, attachmentId)}
-            />
-          ))}
-          {canEdit && showAddColumn ? (
-            <div className="add-column-panel">
-              <input
-                type="text"
-                placeholder="Column name"
-                value={newColumnName}
-                onChange={(e) => setNewColumnName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleCreateColumn()
-                  if (e.key === 'Escape') {
-                    setShowAddColumn(false)
-                    setNewColumnName('')
-                    setColumnError(null)
-                  }
-                }}
-                maxLength={200}
-                disabled={isCreatingColumn}
-                autoFocus
-              />
-              {columnError && <p className="form-error">{columnError}</p>}
-              <div className="inline-actions">
-                <button className="btn btn-primary" onClick={handleCreateColumn} disabled={isCreatingColumn || !newColumnName.trim()}>
-                  {isCreatingColumn ? 'Adding...' : 'Add'}
+        <Droppable droppableId="board-columns" direction="horizontal" type="COLUMN">
+          {(provided) => (
+            <div className="columns" ref={provided.innerRef} {...provided.droppableProps}>
+              {filteredColumns.map((column, index) => (
+                <Draggable key={column.id} draggableId={`column-${column.id}`} index={index} isDragDisabled={!canEdit || hasFilters}>
+                  {(dragProvided, dragSnapshot) => (
+                    <div
+                      className={dragSnapshot.isDragging ? 'column-wrapper column-wrapper-dragging' : 'column-wrapper'}
+                      ref={dragProvided.innerRef}
+                      {...dragProvided.draggableProps}
+                    >
+                      <Column
+                        column={column}
+                        labels={labels}
+                        canEdit={canEdit}
+                        canDrag={canEdit && !hasFilters}
+                        searchTerm={searchTerm}
+                        columnDragHandleProps={dragProvided.dragHandleProps}
+                        onAddCard={(title) => createCard(column.id, title)}
+                        onDeleteCard={(cardId) => deleteCard(cardId, column.id)}
+                        onCreateLabel={createLabel}
+                        onSetCardLabels={(cardId, labelIds) => setCardLabels(cardId, column.id, labelIds)}
+                        onSetCardDueDate={(cardId, dueDate) => setCardDueDate(cardId, column.id, dueDate)}
+                        onGetCardAttachments={(cardId) => getCardAttachments(cardId, column.id)}
+                        onUploadCardAttachment={(cardId, file) => uploadCardAttachment(cardId, column.id, file)}
+                        onDeleteCardAttachment={(cardId, attachmentId) => deleteCardAttachment(cardId, column.id, attachmentId)}
+                      />
+                    </div>
+                  )}
+                </Draggable>
+              ))}
+              {provided.placeholder}
+              {canEdit && showAddColumn ? (
+                <div className="add-column-panel">
+                  <input
+                    type="text"
+                    placeholder="Column name"
+                    value={newColumnName}
+                    onChange={(e) => setNewColumnName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleCreateColumn()
+                      if (e.key === 'Escape') {
+                        setShowAddColumn(false)
+                        setNewColumnName('')
+                        setColumnError(null)
+                      }
+                    }}
+                    maxLength={200}
+                    disabled={isCreatingColumn}
+                    autoFocus
+                  />
+                  {columnError && <p className="form-error">{columnError}</p>}
+                  <div className="inline-actions">
+                    <button className="btn btn-primary" onClick={handleCreateColumn} disabled={isCreatingColumn || !newColumnName.trim()}>
+                      {isCreatingColumn ? 'Adding...' : 'Add'}
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => {
+                        setShowAddColumn(false)
+                        setNewColumnName('')
+                        setColumnError(null)
+                      }}
+                      disabled={isCreatingColumn}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : canEdit ? (
+                <button className="add-column-btn" onClick={() => setShowAddColumn(true)}>
+                  + Add column
                 </button>
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => {
-                    setShowAddColumn(false)
-                    setNewColumnName('')
-                    setColumnError(null)
-                  }}
-                  disabled={isCreatingColumn}
-                >
-                  Cancel
-                </button>
-              </div>
+              ) : null}
             </div>
-          ) : canEdit ? (
-            <button className="add-column-btn" onClick={() => setShowAddColumn(true)}>
-              + Add column
-            </button>
-          ) : null}
-        </div>
+          )}
+        </Droppable>
       </DragDropContext>
     </div>
   )

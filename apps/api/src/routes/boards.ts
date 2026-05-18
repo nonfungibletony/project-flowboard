@@ -389,6 +389,42 @@ router.post("/:id/columns", requireAuth, async (req: Request, res: Response) => 
   res.status(201).json({ success: true, data: inserted[0] });
 });
 
+router.patch("/:id/columns/reorder", requireAuth, async (req: Request, res: Response) => {
+  const access = await getWritableBoard(req.params.id, req.user!.id);
+  if (!access) return res.status(404).json({ success: false, message: "Board not found" });
+
+  const updates = req.body.updates;
+  if (!Array.isArray(updates) || !updates.length) {
+    return res.status(400).json({ success: false, message: "updates must be a non-empty array" });
+  }
+
+  for (const update of updates) {
+    if (!update?.id || !Number.isInteger(update.order) || update.order < 0) {
+      return res.status(400).json({ success: false, message: "updates must include id and non-negative order" });
+    }
+  }
+
+  const columnIds = updates.map((update) => update.id);
+  const columns = await db
+    .select()
+    .from(schema.columns)
+    .where(and(inArray(schema.columns.id, columnIds), eq(schema.columns.boardId, req.params.id)));
+
+  if (columns.length !== columnIds.length) {
+    return res.status(400).json({ success: false, message: "All columns must belong to this board" });
+  }
+
+  for (const update of updates) {
+    await db
+      .update(schema.columns)
+      .set({ order: update.order })
+      .where(eq(schema.columns.id, update.id));
+  }
+
+  const reordered = await db.select().from(schema.columns).where(eq(schema.columns.boardId, req.params.id));
+  res.json({ success: true, data: reordered });
+});
+
 // Card routes via column
 router.post("/columns/:columnId/cards", requireAuth, async (req: Request, res: Response) => {
   const column = await getWritableColumn(req.params.columnId, req.user!.id);

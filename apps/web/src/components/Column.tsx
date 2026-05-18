@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Draggable, Droppable } from '@hello-pangea/dnd'
+import { Draggable, Droppable, type DraggableProvidedDragHandleProps } from '@hello-pangea/dnd'
 import type { Attachment, Column as ColumnType, Card, Label } from '@group/shared'
 import { DeleteCardModal } from './DeleteCardModal'
 
@@ -9,6 +9,7 @@ interface Props {
   canEdit: boolean
   canDrag: boolean
   searchTerm: string
+  columnDragHandleProps?: DraggableProvidedDragHandleProps | null
   onAddCard: (title: string) => Promise<unknown>
   onDeleteCard: (cardId: string) => Promise<unknown>
   onCreateLabel: (name: string, colour: string) => Promise<Label>
@@ -21,7 +22,7 @@ interface Props {
 
 const LABEL_COLOURS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899']
 
-export function Column({ column, labels, canEdit, canDrag, searchTerm, onAddCard, onDeleteCard, onCreateLabel, onSetCardLabels, onSetCardDueDate, onGetCardAttachments, onUploadCardAttachment, onDeleteCardAttachment }: Props) {
+export function Column({ column, labels, canEdit, canDrag, searchTerm, columnDragHandleProps, onAddCard, onDeleteCard, onCreateLabel, onSetCardLabels, onSetCardDueDate, onGetCardAttachments, onUploadCardAttachment, onDeleteCardAttachment }: Props) {
   const [showAdd, setShowAdd] = useState(false)
   const [newCardTitle, setNewCardTitle] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -198,13 +199,13 @@ export function Column({ column, labels, canEdit, canDrag, searchTerm, onAddCard
 
   return (
     <div className="column">
-      <div className="column-header">
+      <div className={`column-header${columnDragHandleProps ? ' column-header-draggable' : ''}`} {...columnDragHandleProps}>
         <h3>{column.name}</h3>
         <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
           {column.cards?.length || 0}
         </span>
       </div>
-      <Droppable droppableId={column.id}>
+      <Droppable droppableId={column.id} type="CARD">
         {(provided, snapshot) => (
           <div
             className={`column-cards${snapshot.isDraggingOver ? ' column-cards-over' : ''}`}

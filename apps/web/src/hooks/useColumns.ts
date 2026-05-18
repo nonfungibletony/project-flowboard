@@ -43,7 +43,7 @@ export function useColumns(boardId: string) {
     const res = await authFetch(`/api/boards/${boardId}/columns`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, order: getNextColumnOrder(columns) }),
     })
     const data = await res.json()
 
@@ -154,6 +154,36 @@ export function useColumns(boardId: string) {
           : column
       )
     )
+  }
+
+  const reorderColumns = async (sourceIndex: number, targetIndex: number) => {
+    setError(null)
+
+    const previousColumns = columns
+    const nextColumns = moveColumn(columns, sourceIndex, targetIndex)
+    if (nextColumns === columns) return
+
+    setColumns(nextColumns)
+
+    const res = await authFetch(`/api/boards/${boardId}/columns/reorder`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updates: nextColumns.map((column) => ({ id: column.id, order: column.order })),
+      }),
+    })
+    const data = await res.json()
+
+    if (!res.ok || !data.success) {
+      setColumns(previousColumns)
+      throw new Error(data.message || 'Unable to reorder columns')
+    }
+
+    const savedColumns = data.data as Column[]
+    setColumns((prev) => {
+      const byId = new Map(savedColumns.map((column) => [column.id, column]))
+      return sortColumns(prev.map((column) => ({ ...column, order: byId.get(column.id)?.order ?? column.order })))
+    })
   }
 
   const deleteCard = async (cardId: string, columnId: string) => {
@@ -334,7 +364,7 @@ export function useColumns(boardId: string) {
     })))
   }
 
-  return { columns, labels, isLoading, error, createColumn, createCard, moveCard, deleteCard, createLabel, setCardLabels, setCardDueDate, getCardAttachments, uploadCardAttachment, deleteCardAttachment }
+  return { columns, labels, isLoading, error, createColumn, createCard, moveCard, reorderColumns, deleteCard, createLabel, setCardLabels, setCardDueDate, getCardAttachments, uploadCardAttachment, deleteCardAttachment }
 }
 
 function sortColumns(columns: Column[]) {
@@ -342,6 +372,10 @@ function sortColumns(columns: Column[]) {
     if (a.order !== b.order) return a.order - b.order
     return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
   })
+}
+
+function getNextColumnOrder(columns: Column[]) {
+  return columns.reduce((maxOrder, column) => Math.max(maxOrder, column.order), -1) + 1
 }
 
 function normalizeColumn(column: Column) {
@@ -402,6 +436,17 @@ function moveCardInColumns(columns: Column[], cardId: string, sourceColumnId: st
 
 function reindexCards(cards: Card[]) {
   return cards.map((card, index) => ({ ...card, order: index }))
+}
+
+function moveColumn(columns: Column[], sourceIndex: number, targetIndex: number) {
+  if (sourceIndex === targetIndex) return columns
+
+  const nextColumns = [...columns]
+  const [movedColumn] = nextColumns.splice(sourceIndex, 1)
+  if (!movedColumn) return columns
+
+  nextColumns.splice(targetIndex, 0, movedColumn)
+  return nextColumns.map((column, index) => ({ ...column, order: index }))
 }
 
 function getCardOrderUpdates(columns: Column[], sourceColumnId: string, targetColumnId: string) {
