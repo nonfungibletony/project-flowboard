@@ -3,18 +3,30 @@ import type { Column as ColumnType, Card } from '@group/shared'
 
 interface Props {
   column: ColumnType
-  onAddCard: (title: string) => void
+  onAddCard: (title: string) => Promise<unknown>
 }
 
 export function Column({ column, onAddCard }: Props) {
   const [showAdd, setShowAdd] = useState(false)
   const [newCardTitle, setNewCardTitle] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!newCardTitle.trim()) return
-    onAddCard(newCardTitle.trim())
-    setNewCardTitle('')
-    setShowAdd(false)
+
+    setError(null)
+    setIsSubmitting(true)
+
+    try {
+      await onAddCard(newCardTitle.trim())
+      setNewCardTitle('')
+      setShowAdd(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to create card')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -37,29 +49,44 @@ export function Column({ column, onAddCard }: Props) {
           >
             <div className="card-title">{card.title}</div>
             <div className="card-meta">
-              {card.comments?.length
-                ? `${card.comments.length} comment${card.comments.length !== 1 ? 's' : ''}`
-                : 'No comments'}
+              {card.comments?.length || 0} comment{(card.comments?.length || 0) !== 1 ? 's' : ''}
             </div>
           </div>
         ))}
       </div>
       {showAdd ? (
-        <div style={{ marginTop: '0.5rem' }}>
+        <div className="add-card-panel">
           <input
             type="text"
             placeholder="Card title"
             value={newCardTitle}
             onChange={(e) => setNewCardTitle(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleAdd()
+              if (e.key === 'Escape') {
+                setShowAdd(false)
+                setNewCardTitle('')
+                setError(null)
+              }
+            }}
+            maxLength={500}
+            disabled={isSubmitting}
             autoFocus
-            style={{ fontSize: '0.85rem', marginBottom: '0.5rem' }}
           />
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button className="btn btn-primary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }} onClick={handleAdd}>
-              Add
+          {error && <p className="form-error">{error}</p>}
+          <div className="inline-actions">
+            <button className="btn btn-primary btn-small" onClick={handleAdd} disabled={isSubmitting || !newCardTitle.trim()}>
+              {isSubmitting ? 'Adding...' : 'Add'}
             </button>
-            <button className="btn btn-secondary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }} onClick={() => { setShowAdd(false); setNewCardTitle('') }}>
+            <button
+              className="btn btn-secondary btn-small"
+              onClick={() => {
+                setShowAdd(false)
+                setNewCardTitle('')
+                setError(null)
+              }}
+              disabled={isSubmitting}
+            >
               Cancel
             </button>
           </div>
