@@ -186,7 +186,12 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     byId.set(row.board.id, row.board);
   }
 
-  res.json({ success: true, data: [...byId.values()] });
+  const boards = [...byId.values()].sort((a, b) => {
+    if (a.starred !== b.starred) return a.starred ? -1 : 1;
+    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+  });
+
+  res.json({ success: true, data: boards });
 });
 
 router.post("/", requireAuth, async (req: Request, res: Response) => {
@@ -194,16 +199,47 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
   if (!parsed.success) {
     return res.status(400).json({ success: false, message: parsed.error.message });
   }
+  const { templateId, ...boardData } = parsed.data;
+  const template = templateId
+    ? await db.select().from(schema.boardTemplates).where(eq(schema.boardTemplates.id, templateId)).limit(1)
+    : [];
+
+  if (templateId && !template.length) {
+    return res.status(400).json({ success: false, message: "Template not found" });
+  }
+
   const inserted = await db.insert(schema.boards).values({
-    ...parsed.data,
+    ...boardData,
     createdBy: req.user!.id,
   }).returning();
+
   await db.insert(schema.boardMembers).values({
     boardId: inserted[0].id,
     userId: req.user!.id,
     role: "owner",
   });
+
+  if (template[0]) {
+    const templateColumns = Array.isArray(template[0].columns) ? template[0].columns : [];
+    const columnValues = templateColumns
+      .filter((column): column is { name: string } => typeof column?.name === "string" && column.name.trim().length > 0)
+      .map((column, index) => ({
+        boardId: inserted[0].id,
+        name: column.name.trim().slice(0, 200),
+        order: index,
+      }));
+
+    if (columnValues.length) {
+      await db.insert(schema.columns).values(columnValues);
+    }
+  }
+
   res.status(201).json({ success: true, data: inserted[0] });
+});
+
+router.get("/templates", requireAuth, async (_req: Request, res: Response) => {
+  const templates = await db.select().from(schema.boardTemplates);
+  res.json({ success: true, data: templates });
 });
 
 router.get("/:id", requireAuth, async (req: Request, res: Response) => {
@@ -222,7 +258,7 @@ router.patch("/:id", requireAuth, async (req: Request, res: Response) => {
   }
   const updated = await db
     .update(schema.boards)
-    .set(parsed.data)
+    .set({ ...parsed.data, updatedAt: new Date() })
     .where(eq(schema.boards.id, req.params.id))
     .returning();
   if (!updated.length) return res.status(404).json({ success: false, message: "Board not found" });

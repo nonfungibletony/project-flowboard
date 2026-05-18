@@ -10,7 +10,7 @@ export function Home() {
   const [boardToDelete, setBoardToDelete] = useState<Board | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
-  const { boards, isLoading, error, createBoard, deleteBoard } = useBoards()
+  const { boards, templates, isLoading, error, createBoard, deleteBoard, toggleStarred } = useBoards()
 
   const handleDeleteBoard = async () => {
     if (!boardToDelete) return
@@ -52,7 +52,12 @@ export function Home() {
       ) : (
         <div className="board-grid">
           {boards.map((board) => (
-            <BoardCard key={board.id} board={board} onDelete={() => setBoardToDelete(board)} />
+            <BoardCard
+              key={board.id}
+              board={board}
+              onDelete={() => setBoardToDelete(board)}
+              onToggleStarred={() => toggleStarred(board.id, !board.starred)}
+            />
           ))}
         </div>
       )}
@@ -61,6 +66,7 @@ export function Home() {
         <CreateBoardModal
           onClose={() => setShowModal(false)}
           onCreate={createBoard}
+          templates={templates}
         />
       )}
 

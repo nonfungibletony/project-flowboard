@@ -1,13 +1,16 @@
 import { useState } from 'react'
+import type { BoardTemplate } from '@group/shared'
 
 interface Props {
   onClose: () => void
-  onCreate: (name: string, description?: string) => Promise<unknown>
+  onCreate: (name: string, description?: string, templateId?: string) => Promise<unknown>
+  templates: BoardTemplate[]
 }
 
-export function CreateBoardModal({ onClose, onCreate }: Props) {
+export function CreateBoardModal({ onClose, onCreate, templates }: Props) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [templateId, setTemplateId] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -19,7 +22,7 @@ export function CreateBoardModal({ onClose, onCreate }: Props) {
     setIsSubmitting(true)
 
     try {
-      await onCreate(name.trim(), description.trim() || undefined)
+      await onCreate(name.trim(), description.trim() || undefined, templateId || undefined)
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to create board')
@@ -49,6 +52,31 @@ export function CreateBoardModal({ onClose, onCreate }: Props) {
             maxLength={500}
             disabled={isSubmitting}
           />
+          {!!templates.length && (
+            <div className="template-picker">
+              <button
+                type="button"
+                className={`template-option${templateId === '' ? ' template-option-selected' : ''}`}
+                onClick={() => setTemplateId('')}
+                disabled={isSubmitting}
+              >
+                <span>Blank</span>
+                <small>Start without columns</small>
+              </button>
+              {templates.map((template) => (
+                <button
+                  key={template.id}
+                  type="button"
+                  className={`template-option${templateId === template.id ? ' template-option-selected' : ''}`}
+                  onClick={() => setTemplateId(template.id)}
+                  disabled={isSubmitting}
+                >
+                  <span>{template.name}</span>
+                  <small>{template.description}</small>
+                </button>
+              ))}
+            </div>
+          )}
           {error && <p className="form-error">{error}</p>}
           <div className="modal-actions">
             <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSubmitting}>

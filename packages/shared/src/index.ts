@@ -22,16 +22,34 @@ export const BoardSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(500).optional(),
   createdBy: z.string().uuid(),
+  starred: z.boolean(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
 
-export const CreateBoardSchema = BoardSchema.omit({ id: true, createdBy: true, createdAt: true, updatedAt: true });
-export const UpdateBoardSchema = CreateBoardSchema.partial();
+export const CreateBoardSchema = BoardSchema.omit({ id: true, createdBy: true, starred: true, createdAt: true, updatedAt: true }).extend({
+  templateId: z.string().uuid().optional(),
+});
+export const UpdateBoardSchema = BoardSchema.pick({ name: true, description: true, starred: true }).partial();
 
 export type Board = z.infer<typeof BoardSchema>;
 export type CreateBoard = z.infer<typeof CreateBoardSchema>;
 export type UpdateBoard = z.infer<typeof UpdateBoardSchema>;
+
+// Board template
+export const BoardTemplateColumnSchema = z.object({
+  name: z.string().min(1).max(200),
+});
+
+export const BoardTemplateSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+  columns: z.array(BoardTemplateColumnSchema),
+  createdAt: z.string().datetime(),
+});
+
+export type BoardTemplate = z.infer<typeof BoardTemplateSchema>;
 
 // Board member
 export const BoardMemberRoleSchema = z.enum(["owner", "editor", "viewer"]);

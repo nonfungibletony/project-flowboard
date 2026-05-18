@@ -1,4 +1,4 @@
-import { serial, uuid, varchar, timestamp, pgTable, integer, text, foreignKey, primaryKey } from "drizzle-orm/pg-core";
+import { serial, uuid, varchar, timestamp, pgTable, integer, text, foreignKey, primaryKey, boolean, jsonb } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -13,8 +13,17 @@ export const boards = pgTable("boards", {
   name: varchar("name", { length: 200 }).notNull(),
   description: varchar("description", { length: 500 }),
   createdBy: uuid("created_by").notNull().references(() => users.id),
+  starred: boolean("starred").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const boardTemplates = pgTable("board_templates", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: varchar("description", { length: 500 }),
+  columns: jsonb("columns").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const boardMembers = pgTable("board_members", {
