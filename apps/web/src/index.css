@@ -43,6 +43,11 @@ body {
   opacity: 0.65;
 }
 
+.btn-small {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+}
+
 .btn-primary {
   background: #2563eb;
   color: white;
@@ -252,6 +257,19 @@ body {
 .add-card-btn:hover {
   background: #d1d5db;
   color: #374151;
+}
+
+.add-card-panel {
+  margin-top: 0.5rem;
+}
+
+.add-card-panel input {
+  width: 100%;
+  padding: 0.55rem 0.6rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
 }
 
 .add-column-btn {
