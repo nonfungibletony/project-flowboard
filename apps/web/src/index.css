@@ -332,6 +332,30 @@ body {
   padding: 0.25rem 0.45rem;
 }
 
+.due-date-badge {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+  padding: 0.25rem 0.45rem;
+}
+
+.due-date-overdue {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.due-date-today {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.due-date-upcoming {
+  background: #dcfce7;
+  color: #166534;
+}
+
 .card-title {
   font-size: 0.9rem;
   color: #111827;

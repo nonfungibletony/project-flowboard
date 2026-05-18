@@ -15,6 +15,13 @@
       "when": 1779105688038,
       "tag": "0001_mean_robbie_robertson",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1779120588567,
+      "tag": "0002_bouncy_gertrude_yorkes",
+      "breakpoints": true
     }
   ]
 }

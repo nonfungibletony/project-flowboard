@@ -182,7 +182,15 @@ router.post("/columns/:columnId/cards", requireAuth, async (req: Request, res: R
   if (!parsed.success) {
     return res.status(400).json({ success: false, message: parsed.error.message });
   }
-  const inserted = await db.insert(schema.cards).values(parsed.data).returning();
+  const values = {
+    ...parsed.data,
+    dueDate: parsed.data.dueDate === undefined
+      ? undefined
+      : parsed.data.dueDate === null
+        ? null
+        : new Date(parsed.data.dueDate),
+  };
+  const inserted = await db.insert(schema.cards).values(values).returning();
   res.status(201).json({ success: true, data: inserted[0] });
 });
 
@@ -235,7 +243,17 @@ router.patch("/cards/:cardId", requireAuth, async (req: Request, res: Response) 
   if (!parsed.success) {
     return res.status(400).json({ success: false, message: parsed.error.message });
   }
-  const updated = await db.update(schema.cards).set(parsed.data).where(eq(schema.cards.id, req.params.cardId)).returning();
+
+  const values = {
+    ...parsed.data,
+    dueDate: parsed.data.dueDate === undefined
+      ? undefined
+      : parsed.data.dueDate === null
+        ? null
+        : new Date(parsed.data.dueDate),
+  };
+
+  const updated = await db.update(schema.cards).set(values).where(eq(schema.cards.id, req.params.cardId)).returning();
   res.json({ success: true, data: updated[0] });
 });
 

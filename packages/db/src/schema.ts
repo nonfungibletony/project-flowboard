@@ -31,6 +31,7 @@ export const cards = pgTable("cards", {
   title: varchar("title", { length: 500 }).notNull(),
   description: text("description"),
   order: integer("order").notNull().default(0),
+  dueDate: timestamp("due_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

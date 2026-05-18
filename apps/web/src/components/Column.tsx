@@ -10,11 +10,12 @@ interface Props {
   onDeleteCard: (cardId: string) => Promise<unknown>
   onCreateLabel: (name: string, colour: string) => Promise<Label>
   onSetCardLabels: (cardId: string, labelIds: string[]) => Promise<unknown>
+  onSetCardDueDate: (cardId: string, dueDate: string | null) => Promise<unknown>
 }
 
 const LABEL_COLOURS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899']
 
-export function Column({ column, labels, onAddCard, onDeleteCard, onCreateLabel, onSetCardLabels }: Props) {
+export function Column({ column, labels, onAddCard, onDeleteCard, onCreateLabel, onSetCardLabels, onSetCardDueDate }: Props) {
   const [showAdd, setShowAdd] = useState(false)
   const [newCardTitle, setNewCardTitle] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -27,6 +28,10 @@ export function Column({ column, labels, onAddCard, onDeleteCard, onCreateLabel,
   const [newLabelColour, setNewLabelColour] = useState(LABEL_COLOURS[0])
   const [labelError, setLabelError] = useState<string | null>(null)
   const [isSavingLabels, setIsSavingLabels] = useState(false)
+  const [dueDateCard, setDueDateCard] = useState<Card | null>(null)
+  const [dueDateValue, setDueDateValue] = useState('')
+  const [dueDateError, setDueDateError] = useState<string | null>(null)
+  const [isSavingDueDate, setIsSavingDueDate] = useState(false)
 
   const handleAdd = async () => {
     if (!newCardTitle.trim()) return
@@ -102,6 +107,30 @@ export function Column({ column, labels, onAddCard, onDeleteCard, onCreateLabel,
     }
   }
 
+  const openDueDatePicker = (card: Card) => {
+    setDueDateCard(card)
+    setDueDateValue(formatDateInput(card.dueDate))
+    setDueDateError(null)
+  }
+
+  const handleSaveDueDate = async (dueDate: string | null) => {
+    if (!dueDateCard) return
+
+    setDueDateError(null)
+    setIsSavingDueDate(true)
+
+    try {
+      await onSetCardDueDate(dueDateCard.id, dueDate)
+      setDueDateCard({ ...dueDateCard, dueDate })
+      setDueDateValue(formatDateInput(dueDate))
+      if (dueDate === null) setDueDateCard(null)
+    } catch (err) {
+      setDueDateError(err instanceof Error ? err.message : 'Unable to update due date')
+    } finally {
+      setIsSavingDueDate(false)
+    }
+  }
+
   return (
     <div className="column">
       <div className="column-header">
@@ -141,9 +170,24 @@ export function Column({ column, labels, onAddCard, onDeleteCard, onCreateLabel,
                         <div className="card-meta">
                           {card.comments?.length || 0} comment{(card.comments?.length || 0) !== 1 ? 's' : ''}
                         </div>
+                        {card.dueDate && (
+                          <span className={`due-date-badge ${getDueDateStatus(card.dueDate)}`}>
+                            {formatDueDate(card.dueDate)}
+                          </span>
+                        )}
                       </div>
                       {!card.id.startsWith('temp-') && (
                         <div className="card-actions">
+                          <button
+                            type="button"
+                            className="card-action-btn"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openDueDatePicker(card)
+                            }}
+                          >
+                            Due
+                          </button>
                           <button
                             type="button"
                             className="card-action-btn"
@@ -288,6 +332,58 @@ export function Column({ column, labels, onAddCard, onDeleteCard, onCreateLabel,
           </div>
         </div>
       )}
+      {dueDateCard && (
+        <div className="modal-overlay" onClick={isSavingDueDate ? undefined : () => setDueDateCard(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Due date</h2>
+            <p className="modal-copy">{dueDateCard.title}</p>
+            <input
+              type="date"
+              value={dueDateValue}
+              onChange={(e) => setDueDateValue(e.target.value)}
+              disabled={isSavingDueDate}
+            />
+            {dueDateError && <p className="form-error">{dueDateError}</p>}
+            <div className="modal-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => handleSaveDueDate(null)} disabled={isSavingDueDate || !dueDateCard.dueDate}>
+                Clear
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => setDueDateCard(null)} disabled={isSavingDueDate}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => handleSaveDueDate(dueDateValue ? new Date(`${dueDateValue}T12:00:00`).toISOString() : null)}
+                disabled={isSavingDueDate}
+              >
+                {isSavingDueDate ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+function formatDateInput(value?: string | null) {
+  if (!value) return ''
+  return value.slice(0, 10)
+}
+
+function formatDueDate(value: string) {
+  const date = new Date(value)
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+function getDueDateStatus(value: string) {
+  const due = new Date(value)
+  const today = new Date()
+  const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime()
+  const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
+
+  if (dueDay < todayDay) return 'due-date-overdue'
+  if (dueDay === todayDay) return 'due-date-today'
+  return 'due-date-upcoming'
 }

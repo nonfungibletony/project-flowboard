@@ -66,6 +66,7 @@ export function useColumns(boardId: string) {
       order: getNextCardOrder(columns, columnId),
       createdAt: now,
       updatedAt: now,
+      dueDate: null,
       comments: [],
       labels: [],
     }
@@ -238,7 +239,47 @@ export function useColumns(boardId: string) {
     )
   }
 
-  return { columns, labels, isLoading, error, createColumn, createCard, moveCard, deleteCard, createLabel, setCardLabels }
+  const setCardDueDate = async (cardId: string, columnId: string, dueDate: string | null) => {
+    setError(null)
+
+    const previousColumns = columns
+    setColumns((prev) =>
+      prev.map((column) =>
+        column.id === columnId
+          ? {
+              ...column,
+              cards: (column.cards || []).map((card) => card.id === cardId ? { ...card, dueDate } : card),
+            }
+          : column
+      )
+    )
+
+    const res = await authFetch(`/api/boards/cards/${cardId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dueDate }),
+    })
+    const data = await res.json()
+
+    if (!res.ok || !data.success) {
+      setColumns(previousColumns)
+      throw new Error(data.message || 'Unable to update due date')
+    }
+
+    const savedCard = normalizeCard(data.data as Card)
+    setColumns((prev) =>
+      prev.map((column) =>
+        column.id === columnId
+          ? {
+              ...column,
+              cards: (column.cards || []).map((card) => card.id === cardId ? { ...savedCard, labels: card.labels || [], comments: card.comments || [] } : card),
+            }
+          : column
+      )
+    )
+  }
+
+  return { columns, labels, isLoading, error, createColumn, createCard, moveCard, deleteCard, createLabel, setCardLabels, setCardDueDate }
 }
 
 function sortColumns(columns: Column[]) {

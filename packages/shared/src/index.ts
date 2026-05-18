@@ -74,6 +74,7 @@ export const CardSchema = z.object({
   title: z.string().min(1).max(500),
   description: z.string().max(5000).optional(),
   order: z.number().int().min(0),
+  dueDate: z.string().datetime().nullable().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   comments: z.array(z.any()).optional(),
@@ -86,6 +87,7 @@ export const UpdateCardSchema = z.object({
   description: z.string().max(5000).optional(),
   columnId: z.string().uuid().optional(),
   order: z.number().int().min(0).optional(),
+  dueDate: z.string().datetime().nullable().optional(),
 });
 
 export type Card = z.infer<typeof CardSchema>;
