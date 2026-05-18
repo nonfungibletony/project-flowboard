@@ -7,6 +7,8 @@ interface Props {
   column: ColumnType
   labels: Label[]
   canEdit: boolean
+  canDrag: boolean
+  searchTerm: string
   onAddCard: (title: string) => Promise<unknown>
   onDeleteCard: (cardId: string) => Promise<unknown>
   onCreateLabel: (name: string, colour: string) => Promise<Label>
@@ -19,7 +21,7 @@ interface Props {
 
 const LABEL_COLOURS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899']
 
-export function Column({ column, labels, canEdit, onAddCard, onDeleteCard, onCreateLabel, onSetCardLabels, onSetCardDueDate, onGetCardAttachments, onUploadCardAttachment, onDeleteCardAttachment }: Props) {
+export function Column({ column, labels, canEdit, canDrag, searchTerm, onAddCard, onDeleteCard, onCreateLabel, onSetCardLabels, onSetCardDueDate, onGetCardAttachments, onUploadCardAttachment, onDeleteCardAttachment }: Props) {
   const [showAdd, setShowAdd] = useState(false)
   const [newCardTitle, setNewCardTitle] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -210,7 +212,7 @@ export function Column({ column, labels, canEdit, onAddCard, onDeleteCard, onCre
             {...provided.droppableProps}
           >
             {(column.cards || []).map((card: Card, index) => (
-              <Draggable key={card.id} draggableId={card.id} index={index} isDragDisabled={!canEdit || card.id.startsWith('temp-')}>
+              <Draggable key={card.id} draggableId={card.id} index={index} isDragDisabled={!canDrag || card.id.startsWith('temp-')}>
                 {(dragProvided, dragSnapshot) => (
                   <div
                     className={`card${dragSnapshot.isDragging ? ' card-dragging' : ''}`}
@@ -224,12 +226,17 @@ export function Column({ column, labels, canEdit, onAddCard, onDeleteCard, onCre
                           <div className="card-labels">
                             {card.labels.map((label) => (
                               <span key={label.id} className="card-label-chip" style={{ backgroundColor: label.colour }}>
-                                {label.name}
+                                {highlightText(label.name, searchTerm)}
                               </span>
                             ))}
                           </div>
                         )}
-                        <div className="card-title">{card.title}</div>
+                        <div className="card-title">{highlightText(card.title, searchTerm)}</div>
+                        {getDescriptionMatch(card, searchTerm) && (
+                          <div className="card-description-match">
+                            {highlightText(getDescriptionMatch(card, searchTerm)!, searchTerm)}
+                          </div>
+                        )}
                         <div className="card-meta">
                           {card.comments?.length || 0} comment{(card.comments?.length || 0) !== 1 ? 's' : ''}
                           {!!card.attachments?.length && (
@@ -540,4 +547,38 @@ function formatFileSize(size: number) {
 function getFileInitials(fileName: string) {
   const ext = fileName.split('.').pop()
   return (ext || 'file').slice(0, 3).toUpperCase()
+}
+
+function highlightText(value: string, searchTerm: string) {
+  if (!searchTerm) return value
+
+  const lowerValue = value.toLowerCase()
+  const index = lowerValue.indexOf(searchTerm)
+  if (index === -1) return value
+
+  const before = value.slice(0, index)
+  const match = value.slice(index, index + searchTerm.length)
+  const after = value.slice(index + searchTerm.length)
+
+  return (
+    <>
+      {before}
+      <mark className="search-highlight">{match}</mark>
+      {after}
+    </>
+  )
+}
+
+function getDescriptionMatch(card: Card, searchTerm: string) {
+  if (!searchTerm || !card.description) return null
+
+  const index = card.description.toLowerCase().indexOf(searchTerm)
+  if (index === -1) return null
+
+  const start = Math.max(0, index - 36)
+  const end = Math.min(card.description.length, index + searchTerm.length + 36)
+  const prefix = start > 0 ? '...' : ''
+  const suffix = end < card.description.length ? '...' : ''
+
+  return `${prefix}${card.description.slice(start, end)}${suffix}`
 }
