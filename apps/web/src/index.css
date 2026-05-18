@@ -53,6 +53,11 @@ body {
   color: white;
 }
 
+.btn-danger {
+  background: #dc2626;
+  color: white;
+}
+
 .board-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -64,10 +69,18 @@ body {
   border-radius: 8px;
   padding: 1.5rem;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.board-card-link {
   text-decoration: none;
   color: inherit;
+  min-width: 0;
+  flex: 1;
 }
 
 .board-card:hover {
@@ -83,6 +96,19 @@ body {
 .board-card p {
   color: #6b7280;
   font-size: 0.9rem;
+}
+
+.board-delete-btn {
+  border: none;
+  background: transparent;
+  color: #b91c1c;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0.25rem 0;
+}
+
+.board-delete-btn:hover {
+  color: #7f1d1d;
 }
 
 .empty-state {
@@ -137,6 +163,12 @@ body {
 }
 
 .modal h2 {
+  margin-bottom: 1rem;
+}
+
+.modal-copy {
+  color: #374151;
+  line-height: 1.5;
   margin-bottom: 1rem;
 }
 

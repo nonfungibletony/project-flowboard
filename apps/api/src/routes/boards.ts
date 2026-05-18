@@ -79,9 +79,11 @@ router.patch("/:id", requireAuth, async (req: Request, res: Response) => {
 });
 
 router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
-  await db
+  const deleted = await db
     .delete(schema.boards)
-    .where(and(eq(schema.boards.id, req.params.id), eq(schema.boards.createdBy, req.user!.id)));
+    .where(and(eq(schema.boards.id, req.params.id), eq(schema.boards.createdBy, req.user!.id)))
+    .returning();
+  if (!deleted.length) return res.status(404).json({ success: false, message: "Board not found" });
   res.json({ success: true });
 });
 

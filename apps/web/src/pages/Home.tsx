@@ -1,12 +1,32 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import type { Board } from '@group/shared'
 import { BoardCard } from '../components/BoardCard'
 import { CreateBoardModal } from '../components/CreateBoardModal'
+import { DeleteBoardModal } from '../components/DeleteBoardModal'
 import { useBoards } from '../hooks/useBoards'
 
 export function Home() {
   const [showModal, setShowModal] = useState(false)
-  const { boards, isLoading, error, createBoard } = useBoards()
+  const [boardToDelete, setBoardToDelete] = useState<Board | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const { boards, isLoading, error, createBoard, deleteBoard } = useBoards()
+
+  const handleDeleteBoard = async () => {
+    if (!boardToDelete) return
+
+    setDeleteError(null)
+    setIsDeleting(true)
+
+    try {
+      await deleteBoard(boardToDelete.id)
+      setBoardToDelete(null)
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Unable to delete board')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   return (
     <div className="container">
@@ -32,13 +52,7 @@ export function Home() {
       ) : (
         <div className="board-grid">
           {boards.map((board) => (
-            <Link
-              key={board.id}
-              to={`/board/${board.id}`}
-              className="board-card"
-            >
-              <BoardCard board={board} />
-            </Link>
+            <BoardCard key={board.id} board={board} onDelete={() => setBoardToDelete(board)} />
           ))}
         </div>
       )}
@@ -47,6 +61,19 @@ export function Home() {
         <CreateBoardModal
           onClose={() => setShowModal(false)}
           onCreate={createBoard}
+        />
+      )}
+
+      {boardToDelete && (
+        <DeleteBoardModal
+          board={boardToDelete}
+          error={deleteError}
+          isDeleting={isDeleting}
+          onCancel={() => {
+            setBoardToDelete(null)
+            setDeleteError(null)
+          }}
+          onConfirm={handleDeleteBoard}
         />
       )}
     </div>

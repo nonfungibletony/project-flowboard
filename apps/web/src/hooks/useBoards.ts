@@ -46,5 +46,22 @@ export function useBoards() {
     return data.data as Board
   }
 
-  return { boards, isLoading, error, createBoard }
+  const deleteBoard = async (boardId: string) => {
+    setError(null)
+
+    const previousBoards = boards
+    setBoards((prev) => prev.filter((board) => board.id !== boardId))
+
+    const res = await authFetch(`/api/boards/${boardId}`, {
+      method: 'DELETE',
+    })
+    const data = await res.json()
+
+    if (!res.ok || !data.success) {
+      setBoards(previousBoards)
+      throw new Error(data.message || 'Unable to delete board')
+    }
+  }
+
+  return { boards, isLoading, error, createBoard, deleteBoard }
 }
