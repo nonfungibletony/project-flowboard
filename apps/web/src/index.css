@@ -279,6 +279,26 @@ body {
   transform: rotate(1deg);
 }
 
+.card-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.card-delete-btn {
+  border: none;
+  background: transparent;
+  color: #b91c1c;
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0;
+}
+
+.card-delete-btn:hover {
+  color: #7f1d1d;
+}
+
 .card-title {
   font-size: 0.9rem;
   color: #111827;

@@ -180,6 +180,16 @@ router.patch("/cards/:cardId", requireAuth, async (req: Request, res: Response) 
   res.json({ success: true, data: updated[0] });
 });
 
+router.delete("/cards/:cardId", requireAuth, async (req: Request, res: Response) => {
+  const card = await getOwnedCard(req.params.cardId, req.user!.id);
+  if (!card) return res.status(404).json({ success: false, message: "Card not found" });
+
+  const deleted = await db.delete(schema.cards).where(eq(schema.cards.id, req.params.cardId)).returning();
+  if (!deleted.length) return res.status(404).json({ success: false, message: "Card not found" });
+
+  res.json({ success: true });
+});
+
 // Comments
 router.get("/cards/:cardId/comments", requireAuth, async (req: Request, res: Response) => {
   const card = await getOwnedCard(req.params.cardId, req.user!.id);

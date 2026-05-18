@@ -146,7 +146,30 @@ export function useColumns(boardId: string) {
     )
   }
 
-  return { columns, isLoading, error, createColumn, createCard, moveCard }
+  const deleteCard = async (cardId: string, columnId: string) => {
+    setError(null)
+
+    const previousColumns = columns
+    setColumns((prev) =>
+      prev.map((column) =>
+        column.id === columnId
+          ? { ...column, cards: reindexCards((column.cards || []).filter((card) => card.id !== cardId)) }
+          : column
+      )
+    )
+
+    const res = await authFetch(`/api/boards/cards/${cardId}`, {
+      method: 'DELETE',
+    })
+    const data = await res.json()
+
+    if (!res.ok || !data.success) {
+      setColumns(previousColumns)
+      throw new Error(data.message || 'Unable to delete card')
+    }
+  }
+
+  return { columns, isLoading, error, createColumn, createCard, moveCard, deleteCard }
 }
 
 function sortColumns(columns: Column[]) {

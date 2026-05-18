@@ -1,17 +1,22 @@
 import { useState } from 'react'
 import { Draggable, Droppable } from '@hello-pangea/dnd'
 import type { Column as ColumnType, Card } from '@group/shared'
+import { DeleteCardModal } from './DeleteCardModal'
 
 interface Props {
   column: ColumnType
   onAddCard: (title: string) => Promise<unknown>
+  onDeleteCard: (cardId: string) => Promise<unknown>
 }
 
-export function Column({ column, onAddCard }: Props) {
+export function Column({ column, onAddCard, onDeleteCard }: Props) {
   const [showAdd, setShowAdd] = useState(false)
   const [newCardTitle, setNewCardTitle] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [cardToDelete, setCardToDelete] = useState<Card | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const handleAdd = async () => {
     if (!newCardTitle.trim()) return
@@ -27,6 +32,22 @@ export function Column({ column, onAddCard }: Props) {
       setError(err instanceof Error ? err.message : 'Unable to create card')
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleDeleteCard = async () => {
+    if (!cardToDelete) return
+
+    setDeleteError(null)
+    setIsDeleting(true)
+
+    try {
+      await onDeleteCard(cardToDelete.id)
+      setCardToDelete(null)
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Unable to delete card')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -54,9 +75,26 @@ export function Column({ column, onAddCard }: Props) {
                     {...dragProvided.draggableProps}
                     {...dragProvided.dragHandleProps}
                   >
-                    <div className="card-title">{card.title}</div>
-                    <div className="card-meta">
-                      {card.comments?.length || 0} comment{(card.comments?.length || 0) !== 1 ? 's' : ''}
+                    <div className="card-main">
+                      <div>
+                        <div className="card-title">{card.title}</div>
+                        <div className="card-meta">
+                          {card.comments?.length || 0} comment{(card.comments?.length || 0) !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                      {!card.id.startsWith('temp-') && (
+                        <button
+                          type="button"
+                          className="card-delete-btn"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setCardToDelete(card)
+                            setDeleteError(null)
+                          }}
+                        >
+                          Delete
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -107,6 +145,18 @@ export function Column({ column, onAddCard }: Props) {
         <button className="add-card-btn" onClick={() => setShowAdd(true)}>
           + Add a card
         </button>
+      )}
+      {cardToDelete && (
+        <DeleteCardModal
+          card={cardToDelete}
+          error={deleteError}
+          isDeleting={isDeleting}
+          onCancel={() => {
+            setCardToDelete(null)
+            setDeleteError(null)
+          }}
+          onConfirm={handleDeleteCard}
+        />
       )}
     </div>
   )
