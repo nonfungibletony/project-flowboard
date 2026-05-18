@@ -174,7 +174,7 @@ router.patch("/cards/:cardId", requireAuth, async (req: Request, res: Response) 
   if (!parsed.success) {
     return res.status(400).json({ success: false, message: parsed.error.message });
   }
-  const updated = await db.update(schema.cards).set(parsed.data).where(eq(schema.cards.id, req.params.cardId)).returning();
+  const updated = await db.update(schema.cards).set({ ...parsed.data, updatedAt: new Date() }).where(eq(schema.cards.id, req.params.cardId)).returning();
   res.json({ success: true, data: updated[0] });
 });
 
@@ -184,7 +184,13 @@ router.get("/cards/:cardId/comments", requireAuth, async (req: Request, res: Res
   if (!card) return res.status(404).json({ success: false, message: "Card not found" });
 
   const comments = await db.select().from(schema.comments).where(eq(schema.comments.cardId, req.params.cardId));
-  res.json({ success: true, data: comments });
+  const commentsWithNames = await Promise.all(
+    comments.map(async (comment) => {
+      const user = await db.select().from(schema.users).where(eq(schema.users.id, comment.userId)).limit(1);
+      return { ...comment, userName: user[0]?.name || "User" };
+    })
+  );
+  res.json({ success: true, data: commentsWithNames });
 });
 
 router.post("/cards/:cardId/comments", requireAuth, async (req: Request, res: Response) => {

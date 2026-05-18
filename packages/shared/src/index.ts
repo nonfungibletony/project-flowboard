@@ -82,11 +82,12 @@ export const CommentSchema = z.object({
   id: z.string().uuid(),
   cardId: z.string().uuid(),
   userId: z.string().uuid(),
+  userName: z.string().optional(),
   content: z.string().min(1).max(2000),
   createdAt: z.string().datetime(),
 });
 
-export const CreateCommentSchema = CommentSchema.omit({ id: true, createdAt: true });
+export const CreateCommentSchema = CommentSchema.omit({ id: true, createdAt: true, userName: true });
 
 export type Comment = z.infer<typeof CommentSchema>;
 export type CreateComment = z.infer<typeof CreateCommentSchema>;

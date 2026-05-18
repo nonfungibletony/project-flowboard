@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
 import { useParams } from 'react-router-dom'
 import { Column } from '../components/Column'
+import { CardDetailModal } from '../components/CardDetailModal'
 import { useBoard } from '../hooks/useBoard'
 import { useColumns } from '../hooks/useColumns'
+import type { Card } from '@group/shared'
 
 export function Board() {
   const { boardId } = useParams()
@@ -12,8 +14,10 @@ export function Board() {
   const [columnError, setColumnError] = useState<string | null>(null)
   const [isCreatingColumn, setIsCreatingColumn] = useState(false)
   const [moveError, setMoveError] = useState<string | null>(null)
+  const [selectedCard, setSelectedCard] = useState<Card | null>(null)
+
   const { board, isLoading: boardLoading } = useBoard(boardId!)
-  const { columns, isLoading: columnsLoading, error, createColumn, createCard, moveCard } = useColumns(boardId!)
+  const { columns, isLoading: columnsLoading, error, createColumn, createCard, updateCard, addComment, moveCard } = useColumns(boardId!)
 
   const handleCreateColumn = async () => {
     if (!newColumnName.trim()) return
@@ -46,6 +50,25 @@ export function Board() {
     }
   }
 
+  const handleCardClick = (card: Card) => {
+    setSelectedCard(card)
+  }
+
+  const handleCloseModal = () => {
+    setSelectedCard(null)
+  }
+
+  const handleUpdateCard = async (updates: { title?: string; description?: string }) => {
+    if (!selectedCard) return
+    await updateCard(selectedCard.id, updates)
+    setSelectedCard((prev) => (prev ? { ...prev, ...updates, updatedAt: new Date().toISOString() } : null))
+  }
+
+  const handleAddComment = async (content: string) => {
+    if (!selectedCard) return
+    await addComment(selectedCard.id, content)
+  }
+
   if (boardLoading || columnsLoading) return <p>Loading...</p>
 
   return (
@@ -64,6 +87,7 @@ export function Board() {
               key={column.id}
               column={column}
               onAddCard={(title) => createCard(column.id, title)}
+              onCardClick={handleCardClick}
             />
           ))}
           {showAddColumn ? (
@@ -110,6 +134,18 @@ export function Board() {
           )}
         </div>
       </DragDropContext>
+
+      {selectedCard && (
+        <CardDetailModal
+          card={selectedCard}
+          comments={selectedCard.comments || []}
+          isLoading={false}
+          error={null}
+          onClose={handleCloseModal}
+          onUpdate={handleUpdateCard}
+          onAddComment={handleAddComment}
+        />
+      )}
     </div>
   )
 }
