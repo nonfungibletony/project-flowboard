@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
 import { useParams } from 'react-router-dom'
 import { Column } from '../components/Column'
 import { useBoard } from '../hooks/useBoard'
@@ -10,8 +11,9 @@ export function Board() {
   const [newColumnName, setNewColumnName] = useState('')
   const [columnError, setColumnError] = useState<string | null>(null)
   const [isCreatingColumn, setIsCreatingColumn] = useState(false)
+  const [moveError, setMoveError] = useState<string | null>(null)
   const { board, isLoading: boardLoading } = useBoard(boardId!)
-  const { columns, isLoading: columnsLoading, error, createColumn, createCard } = useColumns(boardId!)
+  const { columns, isLoading: columnsLoading, error, createColumn, createCard, moveCard } = useColumns(boardId!)
 
   const handleCreateColumn = async () => {
     if (!newColumnName.trim()) return
@@ -30,6 +32,20 @@ export function Board() {
     }
   }
 
+  const handleDragEnd = async (result: DropResult) => {
+    const { destination, draggableId, source } = result
+    if (!destination) return
+    if (destination.droppableId === source.droppableId && destination.index === source.index) return
+
+    setMoveError(null)
+
+    try {
+      await moveCard(draggableId, source.droppableId, destination.droppableId, destination.index)
+    } catch (err) {
+      setMoveError(err instanceof Error ? err.message : 'Unable to move card')
+    }
+  }
+
   if (boardLoading || columnsLoading) return <p>Loading...</p>
 
   return (
@@ -39,59 +55,61 @@ export function Board() {
         {board?.description && <p style={{ color: '#6b7280', marginTop: '0.25rem' }}>{board.description}</p>}
       </div>
 
-      {error && <p className="page-error">{error}</p>}
+      {(error || moveError) && <p className="page-error">{moveError || error}</p>}
 
-      <div className="columns">
-        {columns.map((column) => (
-          <Column
-            key={column.id}
-            column={column}
-            onAddCard={(title) => createCard(column.id, title)}
-          />
-        ))}
-        {showAddColumn ? (
-          <div className="add-column-panel">
-            <input
-              type="text"
-              placeholder="Column name"
-              value={newColumnName}
-              onChange={(e) => setNewColumnName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleCreateColumn()
-                if (e.key === 'Escape') {
-                  setShowAddColumn(false)
-                  setNewColumnName('')
-                  setColumnError(null)
-                }
-              }}
-              maxLength={200}
-              disabled={isCreatingColumn}
-              autoFocus
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <div className="columns">
+          {columns.map((column) => (
+            <Column
+              key={column.id}
+              column={column}
+              onAddCard={(title) => createCard(column.id, title)}
             />
-            {columnError && <p className="form-error">{columnError}</p>}
-            <div className="inline-actions">
-              <button className="btn btn-primary" onClick={handleCreateColumn} disabled={isCreatingColumn || !newColumnName.trim()}>
-                {isCreatingColumn ? 'Adding...' : 'Add'}
-              </button>
-              <button
-                className="btn btn-secondary"
-                onClick={() => {
-                  setShowAddColumn(false)
-                  setNewColumnName('')
-                  setColumnError(null)
+          ))}
+          {showAddColumn ? (
+            <div className="add-column-panel">
+              <input
+                type="text"
+                placeholder="Column name"
+                value={newColumnName}
+                onChange={(e) => setNewColumnName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCreateColumn()
+                  if (e.key === 'Escape') {
+                    setShowAddColumn(false)
+                    setNewColumnName('')
+                    setColumnError(null)
+                  }
                 }}
+                maxLength={200}
                 disabled={isCreatingColumn}
-              >
-                Cancel
-              </button>
+                autoFocus
+              />
+              {columnError && <p className="form-error">{columnError}</p>}
+              <div className="inline-actions">
+                <button className="btn btn-primary" onClick={handleCreateColumn} disabled={isCreatingColumn || !newColumnName.trim()}>
+                  {isCreatingColumn ? 'Adding...' : 'Add'}
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setShowAddColumn(false)
+                    setNewColumnName('')
+                    setColumnError(null)
+                  }}
+                  disabled={isCreatingColumn}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-          </div>
-        ) : (
-          <button className="add-column-btn" onClick={() => setShowAddColumn(true)}>
-            + Add column
-          </button>
-        )}
-      </div>
+          ) : (
+            <button className="add-column-btn" onClick={() => setShowAddColumn(true)}>
+              + Add column
+            </button>
+          )}
+        </div>
+      </DragDropContext>
     </div>
   )
 }

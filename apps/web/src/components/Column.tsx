@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Draggable, Droppable } from '@hello-pangea/dnd'
 import type { Column as ColumnType, Card } from '@group/shared'
 
 interface Props {
@@ -37,23 +38,34 @@ export function Column({ column, onAddCard }: Props) {
           {column.cards?.length || 0}
         </span>
       </div>
-      <div className="column-cards">
-        {(column.cards || []).map((card: Card) => (
+      <Droppable droppableId={column.id}>
+        {(provided, snapshot) => (
           <div
-            key={card.id}
-            className="card"
-            draggable
-            onDragEnd={() => {
-              // Drag and drop to be implemented with proper DnD library
-            }}
+            className={`column-cards${snapshot.isDraggingOver ? ' column-cards-over' : ''}`}
+            ref={provided.innerRef}
+            {...provided.droppableProps}
           >
-            <div className="card-title">{card.title}</div>
-            <div className="card-meta">
-              {card.comments?.length || 0} comment{(card.comments?.length || 0) !== 1 ? 's' : ''}
-            </div>
+            {(column.cards || []).map((card: Card, index) => (
+              <Draggable key={card.id} draggableId={card.id} index={index} isDragDisabled={card.id.startsWith('temp-')}>
+                {(dragProvided, dragSnapshot) => (
+                  <div
+                    className={`card${dragSnapshot.isDragging ? ' card-dragging' : ''}`}
+                    ref={dragProvided.innerRef}
+                    {...dragProvided.draggableProps}
+                    {...dragProvided.dragHandleProps}
+                  >
+                    <div className="card-title">{card.title}</div>
+                    <div className="card-meta">
+                      {card.comments?.length || 0} comment{(card.comments?.length || 0) !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                )}
+              </Draggable>
+            ))}
+            {provided.placeholder}
           </div>
-        ))}
-      </div>
+        )}
+      </Droppable>
       {showAdd ? (
         <div className="add-card-panel">
           <input
