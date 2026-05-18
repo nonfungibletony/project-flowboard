@@ -176,6 +176,7 @@ body {
   gap: 1rem;
   overflow-x: auto;
   padding-bottom: 1rem;
+  align-items: flex-start;
 }
 
 .column {
@@ -268,6 +269,30 @@ body {
 .add-column-btn:hover {
   border-color: #9ca3af;
   color: #374151;
+}
+
+.add-column-panel {
+  min-width: 280px;
+  max-width: 280px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.75rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.add-column-panel input {
+  width: 100%;
+  padding: 0.6rem 0.65rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  margin-bottom: 0.75rem;
+}
+
+.inline-actions {
+  display: flex;
+  gap: 0.5rem;
 }
 
 /* Auth pages */
