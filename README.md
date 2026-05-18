@@ -58,22 +58,71 @@ pnpm dev
 - API: http://localhost:4000
 - Health check: http://localhost:4000/health
 
-## User Stories (MVP)
+## Feature Roadmap (Trello-style Kanban)
 
-- ✅ Sign up and log in (Clerk auth — see #1)
-- ✅ Create a board
-- ✅ Create columns in a board
-- ✅ Create cards in a column
-- ✅ Move cards between columns (drag and drop)
-- ✅ Edit card details
-- ✅ Comment on a card
+### ✅ MVP — Complete
 
-## Post-MVP (see GitHub Issues)
+| Feature | Issue | Status |
+|---------|-------|--------|
+| Sign up and log in (Clerk auth) | [#1](https://github.com/nonfungibletony/project-flowboard/issues/1) | ✅ Done |
+| Create and list boards | [#2](https://github.com/nonfungibletony/project-flowboard/issues/2) | ✅ Done |
+| Create columns in a board | [#3](https://github.com/nonfungibletony/project-flowboard/issues/3) | ✅ Done |
+| Create cards in a column | [#4](https://github.com/nonfungibletony/project-flowboard/issues/4) | ✅ Done |
+| Drag and drop to move cards | [#5](https://github.com/nonfungibletony/project-flowboard/issues/5) | ✅ Done |
+| Edit card details | [#6](https://github.com/nonfungibletony/project-flowboard/issues/6) | ✅ Done |
+| Comment on a card | [#7](https://github.com/nonfungibletony/project-flowboard/issues/7) | ✅ Done |
 
-- [ ] Add logout UI/UX button ([#11](https://github.com/nonfungibletony/project-flowboard/issues/11))
-- [ ] Evaluate httpOnly cookie session architecture ([#12](https://github.com/nonfungibletony/project-flowboard/issues/12))
-- [ ] Real-time updates (WebSockets or SSE)
-- [ ] Deploy (Vercel frontend + Railway/Fly.io backend)
+### 🔧 Phase 1 — Core CRUD Completeness
+
+Missing delete/archive operations and polish that makes the board feel complete.
+
+| Feature | Issue | Priority |
+|---------|-------|----------|
+| Delete / archive a board | [#20](https://github.com/nonfungibletony/project-flowboard/issues/20) | High |
+| Delete / archive a card | [#21](https://github.com/nonfungibletony/project-flowboard/issues/21) | High |
+| Logout UI/UX button | [#11](https://github.com/nonfungibletony/project-flowboard/issues/11) | High |
+| Reorder columns by drag and drop | [#27](https://github.com/nonfungibletony/project-flowboard/issues/27) | Medium |
+
+### 🏷️ Phase 2 — Organisation & Discovery
+
+Trello-style labels, due dates, search, and visual hierarchy.
+
+| Feature | Issue | Priority |
+|---------|-------|----------|
+| Labels / tags for cards | [#22](https://github.com/nonfungibletony/project-flowboard/issues/22) | Medium |
+| Due dates on cards | [#23](https://github.com/nonfungibletony/project-flowboard/issues/23) | Medium |
+| Search and filter cards | [#26](https://github.com/nonfungibletony/project-flowboard/issues/26) | Medium |
+
+### 👥 Phase 3 — Collaboration
+
+Multi-user sharing, permissions, and visibility.
+
+| Feature | Issue | Priority |
+|---------|-------|----------|
+| Board members / sharing | [#24](https://github.com/nonfungibletony/project-flowboard/issues/24) | Medium |
+| Activity log / audit trail | [#30](https://github.com/nonfungibletony/project-flowboard/issues/30) | Low |
+
+### ⚡ Phase 4 — Power User Features
+
+Checklists, attachments, templates, backgrounds, and keyboard shortcuts.
+
+| Feature | Issue | Priority |
+|---------|-------|----------|
+| Card checklists / subtasks | [#29](https://github.com/nonfungibletony/project-flowboard/issues/29) | Low |
+| Attachments / file uploads | [#25](https://github.com/nonfungibletony/project-flowboard/issues/25) | Low |
+| Board templates / starred boards | [#28](https://github.com/nonfungibletony/project-flowboard/issues/28) | Low |
+| Board backgrounds / cover colours | [#31](https://github.com/nonfungibletony/project-flowboard/issues/31) | Low |
+| Keyboard shortcuts | [#32](https://github.com/nonfungibletony/project-flowboard/issues/32) | Low |
+
+### 🚀 Phase 5 — Infrastructure & Scale
+
+Deployment, real-time sync, and auth architecture.
+
+| Feature | Issue | Priority |
+|---------|-------|----------|
+| Evaluate httpOnly cookie session architecture | [#12](https://github.com/nonfungibletony/project-flowboard/issues/12) | Medium |
+| Real-time updates (WebSockets or SSE) | — | Medium |
+| Deploy (Vercel frontend + Railway/Fly.io backend) | — | Medium |
 
 ## API Routes
 
