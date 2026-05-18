@@ -33,6 +33,25 @@ export type Board = z.infer<typeof BoardSchema>;
 export type CreateBoard = z.infer<typeof CreateBoardSchema>;
 export type UpdateBoard = z.infer<typeof UpdateBoardSchema>;
 
+// Board member
+export const BoardMemberRoleSchema = z.enum(["owner", "editor", "viewer"]);
+
+export const BoardMemberSchema = z.object({
+  boardId: z.string().uuid(),
+  userId: z.string().uuid(),
+  role: BoardMemberRoleSchema,
+  createdAt: z.string().datetime(),
+});
+
+export const InviteBoardMemberSchema = z.object({
+  email: z.string().email(),
+  role: BoardMemberRoleSchema.exclude(["owner"]),
+});
+
+export type BoardMemberRole = z.infer<typeof BoardMemberRoleSchema>;
+export type BoardMember = z.infer<typeof BoardMemberSchema>;
+export type InviteBoardMember = z.infer<typeof InviteBoardMemberSchema>;
+
 // Column
 export const ColumnSchema = z.object({
   id: z.string().uuid(),

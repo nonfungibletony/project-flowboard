@@ -17,6 +17,15 @@ export const boards = pgTable("boards", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const boardMembers = pgTable("board_members", {
+  boardId: uuid("board_id").notNull().references(() => boards.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: varchar("role", { length: 20 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.boardId, table.userId] }),
+}));
+
 export const columns = pgTable("columns", {
   id: uuid("id").defaultRandom().primaryKey(),
   boardId: uuid("board_id").notNull().references(() => boards.id, { onDelete: "cascade" }),

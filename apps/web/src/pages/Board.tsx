@@ -12,8 +12,15 @@ export function Board() {
   const [columnError, setColumnError] = useState<string | null>(null)
   const [isCreatingColumn, setIsCreatingColumn] = useState(false)
   const [moveError, setMoveError] = useState<string | null>(null)
-  const { board, isLoading: boardLoading } = useBoard(boardId!)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState<'editor' | 'viewer'>('editor')
+  const [inviteError, setInviteError] = useState<string | null>(null)
+  const [isInviting, setIsInviting] = useState(false)
+  const { board, members, isLoading: boardLoading, error: boardError, inviteMember, removeMember } = useBoard(boardId!)
   const { columns, labels, isLoading: columnsLoading, error, createColumn, createCard, moveCard, deleteCard, createLabel, setCardLabels, setCardDueDate } = useColumns(boardId!)
+
+  const canEdit = board?.role === 'owner' || board?.role === 'editor'
+  const isOwner = board?.role === 'owner'
 
   const handleCreateColumn = async () => {
     if (!newColumnName.trim()) return
@@ -33,6 +40,7 @@ export function Board() {
   }
 
   const handleDragEnd = async (result: DropResult) => {
+    if (!canEdit) return
     const { destination, draggableId, source } = result
     if (!destination) return
     if (destination.droppableId === source.droppableId && destination.index === source.index) return
@@ -46,16 +54,67 @@ export function Board() {
     }
   }
 
+  const handleInviteMember = async () => {
+    if (!inviteEmail.trim()) return
+
+    setInviteError(null)
+    setIsInviting(true)
+
+    try {
+      await inviteMember(inviteEmail.trim(), inviteRole)
+      setInviteEmail('')
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : 'Unable to invite member')
+    } finally {
+      setIsInviting(false)
+    }
+  }
+
   if (boardLoading || columnsLoading) return <p>Loading...</p>
 
   return (
     <div className="container">
       <div className="board-header">
-        <h1>{board?.name || 'Board'}</h1>
-        {board?.description && <p style={{ color: '#6b7280', marginTop: '0.25rem' }}>{board.description}</p>}
+        <div>
+          <h1>{board?.name || 'Board'}</h1>
+          {board?.description && <p style={{ color: '#6b7280', marginTop: '0.25rem' }}>{board.description}</p>}
+        </div>
+        <div className="member-strip">
+          {members.map((member) => (
+            <div key={member.userId} className="member-pill" title={`${member.name} (${member.role})`}>
+              <span className="member-avatar">{getInitials(member.name || member.email)}</span>
+              <span>{member.name}</span>
+              <span className="member-role">{member.role}</span>
+              {isOwner && member.role !== 'owner' && (
+                <button type="button" className="member-remove" onClick={() => removeMember(member.userId)}>
+                  Remove
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
-      {(error || moveError) && <p className="page-error">{moveError || error}</p>}
+      {isOwner && (
+        <div className="invite-panel">
+          <input
+            type="email"
+            placeholder="Invite by email"
+            value={inviteEmail}
+            onChange={(e) => setInviteEmail(e.target.value)}
+            disabled={isInviting}
+          />
+          <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value as 'editor' | 'viewer')} disabled={isInviting}>
+            <option value="editor">Editor</option>
+            <option value="viewer">Viewer</option>
+          </select>
+          <button className="btn btn-primary" onClick={handleInviteMember} disabled={isInviting || !inviteEmail.trim()}>
+            {isInviting ? 'Inviting...' : 'Invite'}
+          </button>
+        </div>
+      )}
+
+      {(boardError || error || moveError || inviteError) && <p className="page-error">{inviteError || moveError || error || boardError}</p>}
 
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="columns">
@@ -64,6 +123,7 @@ export function Board() {
               key={column.id}
               column={column}
               labels={labels}
+              canEdit={canEdit}
               onAddCard={(title) => createCard(column.id, title)}
               onDeleteCard={(cardId) => deleteCard(cardId, column.id)}
               onCreateLabel={createLabel}
@@ -71,7 +131,7 @@ export function Board() {
               onSetCardDueDate={(cardId, dueDate) => setCardDueDate(cardId, column.id, dueDate)}
             />
           ))}
-          {showAddColumn ? (
+          {canEdit && showAddColumn ? (
             <div className="add-column-panel">
               <input
                 type="text"
@@ -108,13 +168,22 @@ export function Board() {
                 </button>
               </div>
             </div>
-          ) : (
+          ) : canEdit ? (
             <button className="add-column-btn" onClick={() => setShowAddColumn(true)}>
               + Add column
             </button>
-          )}
+          ) : null}
         </div>
       </DragDropContext>
     </div>
   )
+}
+
+function getInitials(value: string) {
+  return value
+    .split(/\s|@/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('')
 }

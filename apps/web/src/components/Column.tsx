@@ -6,6 +6,7 @@ import { DeleteCardModal } from './DeleteCardModal'
 interface Props {
   column: ColumnType
   labels: Label[]
+  canEdit: boolean
   onAddCard: (title: string) => Promise<unknown>
   onDeleteCard: (cardId: string) => Promise<unknown>
   onCreateLabel: (name: string, colour: string) => Promise<Label>
@@ -15,7 +16,7 @@ interface Props {
 
 const LABEL_COLOURS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899']
 
-export function Column({ column, labels, onAddCard, onDeleteCard, onCreateLabel, onSetCardLabels, onSetCardDueDate }: Props) {
+export function Column({ column, labels, canEdit, onAddCard, onDeleteCard, onCreateLabel, onSetCardLabels, onSetCardDueDate }: Props) {
   const [showAdd, setShowAdd] = useState(false)
   const [newCardTitle, setNewCardTitle] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -147,7 +148,7 @@ export function Column({ column, labels, onAddCard, onDeleteCard, onCreateLabel,
             {...provided.droppableProps}
           >
             {(column.cards || []).map((card: Card, index) => (
-              <Draggable key={card.id} draggableId={card.id} index={index} isDragDisabled={card.id.startsWith('temp-')}>
+              <Draggable key={card.id} draggableId={card.id} index={index} isDragDisabled={!canEdit || card.id.startsWith('temp-')}>
                 {(dragProvided, dragSnapshot) => (
                   <div
                     className={`card${dragSnapshot.isDragging ? ' card-dragging' : ''}`}
@@ -176,7 +177,7 @@ export function Column({ column, labels, onAddCard, onDeleteCard, onCreateLabel,
                           </span>
                         )}
                       </div>
-                      {!card.id.startsWith('temp-') && (
+                      {canEdit && !card.id.startsWith('temp-') && (
                         <div className="card-actions">
                           <button
                             type="button"
@@ -221,7 +222,7 @@ export function Column({ column, labels, onAddCard, onDeleteCard, onCreateLabel,
           </div>
         )}
       </Droppable>
-      {showAdd ? (
+      {canEdit && showAdd ? (
         <div className="add-card-panel">
           <input
             type="text"
@@ -258,11 +259,11 @@ export function Column({ column, labels, onAddCard, onDeleteCard, onCreateLabel,
             </button>
           </div>
         </div>
-      ) : (
+      ) : canEdit ? (
         <button className="add-card-btn" onClick={() => setShowAdd(true)}>
           + Add a card
         </button>
-      )}
+      ) : null}
       {cardToDelete && (
         <DeleteCardModal
           card={cardToDelete}

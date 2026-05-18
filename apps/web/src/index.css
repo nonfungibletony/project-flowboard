@@ -200,12 +200,85 @@ body {
 
 /* Board page */
 .board-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
   margin-bottom: 1.5rem;
 }
 
 .board-header h1 {
   font-size: 1.5rem;
   color: #111827;
+}
+
+.member-strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  max-width: 640px;
+}
+
+.member-pill {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  display: inline-flex;
+  gap: 0.4rem;
+  padding: 0.25rem 0.55rem 0.25rem 0.25rem;
+  font-size: 0.8rem;
+  color: #374151;
+}
+
+.member-avatar {
+  align-items: center;
+  background: #2563eb;
+  border-radius: 999px;
+  color: #ffffff;
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 700;
+  height: 1.5rem;
+  justify-content: center;
+  width: 1.5rem;
+}
+
+.member-role {
+  color: #6b7280;
+}
+
+.member-remove {
+  background: transparent;
+  border: none;
+  color: #b91c1c;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.invite-panel {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+}
+
+.invite-panel input,
+.invite-panel select {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  padding: 0.55rem 0.65rem;
+}
+
+.invite-panel input {
+  flex: 1;
+  min-width: 220px;
 }
 
 .columns {

@@ -1,22 +1,53 @@
 import { Router, Request, Response } from "express";
-import { CreateBoardSchema, UpdateBoardSchema, CreateColumnSchema, CreateCardSchema, UpdateCardSchema, CreateCommentSchema, CreateLabelSchema } from "@group/shared";
+import { CreateBoardSchema, UpdateBoardSchema, CreateColumnSchema, CreateCardSchema, UpdateCardSchema, CreateCommentSchema, CreateLabelSchema, InviteBoardMemberSchema } from "@group/shared";
 import { db, schema } from "@group/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
 
-async function getOwnedBoard(boardId: string, userId: string) {
+type BoardRole = "owner" | "editor" | "viewer";
+
+async function getBoardRole(boardId: string, userId: string): Promise<BoardRole | null> {
   const board = await db
     .select()
     .from(schema.boards)
-    .where(and(eq(schema.boards.id, boardId), eq(schema.boards.createdBy, userId)))
+    .where(eq(schema.boards.id, boardId))
     .limit(1);
 
-  return board[0] ?? null;
+  if (!board.length) return null;
+  if (board[0].createdBy === userId) return "owner";
+
+  const member = await db
+    .select()
+    .from(schema.boardMembers)
+    .where(and(eq(schema.boardMembers.boardId, boardId), eq(schema.boardMembers.userId, userId)))
+    .limit(1);
+
+  return (member[0]?.role as BoardRole | undefined) ?? null;
 }
 
-async function getOwnedColumn(columnId: string, userId: string) {
+async function getReadableBoard(boardId: string, userId: string) {
+  const role = await getBoardRole(boardId, userId);
+  if (!role) return null;
+
+  const board = await db.select().from(schema.boards).where(eq(schema.boards.id, boardId)).limit(1);
+  return board[0] ? { board: board[0], role } : null;
+}
+
+async function getWritableBoard(boardId: string, userId: string) {
+  const access = await getReadableBoard(boardId, userId);
+  if (!access || access.role === "viewer") return null;
+  return access;
+}
+
+async function getOwnerBoard(boardId: string, userId: string) {
+  const access = await getReadableBoard(boardId, userId);
+  if (!access || access.role !== "owner") return null;
+  return access;
+}
+
+async function getReadableColumn(columnId: string, userId: string) {
   const column = await db
     .select()
     .from(schema.columns)
@@ -24,11 +55,23 @@ async function getOwnedColumn(columnId: string, userId: string) {
     .limit(1);
 
   if (!column.length) return null;
-  const board = await getOwnedBoard(column[0].boardId, userId);
-  return board ? column[0] : null;
+  const access = await getReadableBoard(column[0].boardId, userId);
+  return access ? column[0] : null;
 }
 
-async function getOwnedCard(cardId: string, userId: string) {
+async function getWritableColumn(columnId: string, userId: string) {
+  const column = await db
+    .select()
+    .from(schema.columns)
+    .where(eq(schema.columns.id, columnId))
+    .limit(1);
+
+  if (!column.length) return null;
+  const access = await getWritableBoard(column[0].boardId, userId);
+  return access ? column[0] : null;
+}
+
+async function getReadableCard(cardId: string, userId: string) {
   const card = await db
     .select()
     .from(schema.cards)
@@ -36,15 +79,27 @@ async function getOwnedCard(cardId: string, userId: string) {
     .limit(1);
 
   if (!card.length) return null;
-  const column = await getOwnedColumn(card[0].columnId, userId);
+  const column = await getReadableColumn(card[0].columnId, userId);
   return column ? card[0] : null;
 }
 
-async function getCardBoard(cardId: string, userId: string) {
-  const card = await getOwnedCard(cardId, userId);
+async function getWritableCard(cardId: string, userId: string) {
+  const card = await db
+    .select()
+    .from(schema.cards)
+    .where(eq(schema.cards.id, cardId))
+    .limit(1);
+
+  if (!card.length) return null;
+  const column = await getWritableColumn(card[0].columnId, userId);
+  return column ? card[0] : null;
+}
+
+async function getWritableCardBoard(cardId: string, userId: string) {
+  const card = await getWritableCard(cardId, userId);
   if (!card) return null;
 
-  const column = await getOwnedColumn(card.columnId, userId);
+  const column = await getWritableColumn(card.columnId, userId);
   if (!column) return null;
 
   return { card, boardId: column.boardId };
@@ -72,8 +127,19 @@ async function getLabelsByCardIds(cardIds: string[]) {
 
 // Boards
 router.get("/", requireAuth, async (req: Request, res: Response) => {
-  const boards = await db.select().from(schema.boards).where(eq(schema.boards.createdBy, req.user!.id));
-  res.json({ success: true, data: boards });
+  const ownedBoards = await db.select().from(schema.boards).where(eq(schema.boards.createdBy, req.user!.id));
+  const memberBoards = await db
+    .select({ board: schema.boards })
+    .from(schema.boardMembers)
+    .innerJoin(schema.boards, eq(schema.boardMembers.boardId, schema.boards.id))
+    .where(eq(schema.boardMembers.userId, req.user!.id));
+
+  const byId = new Map(ownedBoards.map((board) => [board.id, board]));
+  for (const row of memberBoards) {
+    byId.set(row.board.id, row.board);
+  }
+
+  res.json({ success: true, data: [...byId.values()] });
 });
 
 router.post("/", requireAuth, async (req: Request, res: Response) => {
@@ -85,16 +151,24 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
     ...parsed.data,
     createdBy: req.user!.id,
   }).returning();
+  await db.insert(schema.boardMembers).values({
+    boardId: inserted[0].id,
+    userId: req.user!.id,
+    role: "owner",
+  });
   res.status(201).json({ success: true, data: inserted[0] });
 });
 
 router.get("/:id", requireAuth, async (req: Request, res: Response) => {
-  const board = await getOwnedBoard(req.params.id, req.user!.id);
-  if (!board) return res.status(404).json({ success: false, message: "Board not found" });
-  res.json({ success: true, data: board });
+  const access = await getReadableBoard(req.params.id, req.user!.id);
+  if (!access) return res.status(404).json({ success: false, message: "Board not found" });
+  res.json({ success: true, data: { ...access.board, role: access.role } });
 });
 
 router.patch("/:id", requireAuth, async (req: Request, res: Response) => {
+  const access = await getWritableBoard(req.params.id, req.user!.id);
+  if (!access) return res.status(404).json({ success: false, message: "Board not found" });
+
   const parsed = UpdateBoardSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ success: false, message: parsed.error.message });
@@ -102,33 +176,128 @@ router.patch("/:id", requireAuth, async (req: Request, res: Response) => {
   const updated = await db
     .update(schema.boards)
     .set(parsed.data)
-    .where(and(eq(schema.boards.id, req.params.id), eq(schema.boards.createdBy, req.user!.id)))
+    .where(eq(schema.boards.id, req.params.id))
     .returning();
   if (!updated.length) return res.status(404).json({ success: false, message: "Board not found" });
   res.json({ success: true, data: updated[0] });
 });
 
 router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
+  const access = await getOwnerBoard(req.params.id, req.user!.id);
+  if (!access) return res.status(404).json({ success: false, message: "Board not found" });
+
   const deleted = await db
     .delete(schema.boards)
-    .where(and(eq(schema.boards.id, req.params.id), eq(schema.boards.createdBy, req.user!.id)))
+    .where(eq(schema.boards.id, req.params.id))
     .returning();
   if (!deleted.length) return res.status(404).json({ success: false, message: "Board not found" });
   res.json({ success: true });
 });
 
+// Members
+router.get("/:id/members", requireAuth, async (req: Request, res: Response) => {
+  const access = await getReadableBoard(req.params.id, req.user!.id);
+  if (!access) return res.status(404).json({ success: false, message: "Board not found" });
+
+  const owner = await db
+    .select({
+      boardId: schema.boards.id,
+      userId: schema.users.id,
+      role: schema.boardMembers.role,
+      email: schema.users.email,
+      name: schema.users.name,
+      createdAt: schema.users.createdAt,
+    })
+    .from(schema.boards)
+    .innerJoin(schema.users, eq(schema.boards.createdBy, schema.users.id))
+    .leftJoin(schema.boardMembers, and(eq(schema.boardMembers.boardId, schema.boards.id), eq(schema.boardMembers.userId, schema.users.id)))
+    .where(eq(schema.boards.id, req.params.id))
+    .limit(1);
+
+  const members = await db
+    .select({
+      boardId: schema.boardMembers.boardId,
+      userId: schema.users.id,
+      role: schema.boardMembers.role,
+      email: schema.users.email,
+      name: schema.users.name,
+      createdAt: schema.boardMembers.createdAt,
+    })
+    .from(schema.boardMembers)
+    .innerJoin(schema.users, eq(schema.boardMembers.userId, schema.users.id))
+    .where(eq(schema.boardMembers.boardId, req.params.id));
+
+  const byUserId = new Map(members.map((member) => [member.userId, member]));
+  if (owner[0]) {
+    byUserId.set(owner[0].userId, { ...owner[0], role: "owner" });
+  }
+
+  res.json({ success: true, data: [...byUserId.values()] });
+});
+
+router.post("/:id/members", requireAuth, async (req: Request, res: Response) => {
+  const access = await getOwnerBoard(req.params.id, req.user!.id);
+  if (!access) return res.status(404).json({ success: false, message: "Board not found" });
+
+  const parsed = InviteBoardMemberSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ success: false, message: parsed.error.message });
+  }
+
+  const user = await db.select().from(schema.users).where(eq(schema.users.email, parsed.data.email)).limit(1);
+  if (!user.length) return res.status(404).json({ success: false, message: "User not found" });
+  if (user[0].id === access.board.createdBy) {
+    return res.status(400).json({ success: false, message: "Board owner is already a member" });
+  }
+
+  const existing = await db
+    .select()
+    .from(schema.boardMembers)
+    .where(and(eq(schema.boardMembers.boardId, req.params.id), eq(schema.boardMembers.userId, user[0].id)))
+    .limit(1);
+
+  const member = existing.length
+    ? await db
+        .update(schema.boardMembers)
+        .set({ role: parsed.data.role })
+        .where(and(eq(schema.boardMembers.boardId, req.params.id), eq(schema.boardMembers.userId, user[0].id)))
+        .returning()
+    : await db
+        .insert(schema.boardMembers)
+        .values({ boardId: req.params.id, userId: user[0].id, role: parsed.data.role })
+        .returning();
+
+  res.status(existing.length ? 200 : 201).json({
+    success: true,
+    data: { ...member[0], email: user[0].email, name: user[0].name },
+  });
+});
+
+router.delete("/:id/members/:userId", requireAuth, async (req: Request, res: Response) => {
+  const access = await getOwnerBoard(req.params.id, req.user!.id);
+  if (!access) return res.status(404).json({ success: false, message: "Board not found" });
+  if (req.params.userId === access.board.createdBy) {
+    return res.status(400).json({ success: false, message: "Cannot remove the board owner" });
+  }
+
+  await db
+    .delete(schema.boardMembers)
+    .where(and(eq(schema.boardMembers.boardId, req.params.id), eq(schema.boardMembers.userId, req.params.userId)));
+  res.json({ success: true });
+});
+
 // Labels
 router.get("/:id/labels", requireAuth, async (req: Request, res: Response) => {
-  const board = await getOwnedBoard(req.params.id, req.user!.id);
-  if (!board) return res.status(404).json({ success: false, message: "Board not found" });
+  const access = await getReadableBoard(req.params.id, req.user!.id);
+  if (!access) return res.status(404).json({ success: false, message: "Board not found" });
 
   const labels = await db.select().from(schema.labels).where(eq(schema.labels.boardId, req.params.id));
   res.json({ success: true, data: labels });
 });
 
 router.post("/:id/labels", requireAuth, async (req: Request, res: Response) => {
-  const board = await getOwnedBoard(req.params.id, req.user!.id);
-  if (!board) return res.status(404).json({ success: false, message: "Board not found" });
+  const access = await getWritableBoard(req.params.id, req.user!.id);
+  if (!access) return res.status(404).json({ success: false, message: "Board not found" });
 
   const parsed = CreateLabelSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -144,8 +313,8 @@ router.post("/:id/labels", requireAuth, async (req: Request, res: Response) => {
 
 // Columns
 router.get("/:id/columns", requireAuth, async (req: Request, res: Response) => {
-  const board = await getOwnedBoard(req.params.id, req.user!.id);
-  if (!board) return res.status(404).json({ success: false, message: "Board not found" });
+  const access = await getReadableBoard(req.params.id, req.user!.id);
+  if (!access) return res.status(404).json({ success: false, message: "Board not found" });
 
   const cols = await db.select().from(schema.columns).where(eq(schema.columns.boardId, req.params.id));
   const colsWithCards = await Promise.all(
@@ -162,8 +331,8 @@ router.get("/:id/columns", requireAuth, async (req: Request, res: Response) => {
 });
 
 router.post("/:id/columns", requireAuth, async (req: Request, res: Response) => {
-  const board = await getOwnedBoard(req.params.id, req.user!.id);
-  if (!board) return res.status(404).json({ success: false, message: "Board not found" });
+  const access = await getWritableBoard(req.params.id, req.user!.id);
+  if (!access) return res.status(404).json({ success: false, message: "Board not found" });
 
   const parsed = CreateColumnSchema.safeParse({ ...req.body, boardId: req.params.id });
   if (!parsed.success) {
@@ -175,7 +344,7 @@ router.post("/:id/columns", requireAuth, async (req: Request, res: Response) => 
 
 // Card routes via column
 router.post("/columns/:columnId/cards", requireAuth, async (req: Request, res: Response) => {
-  const column = await getOwnedColumn(req.params.columnId, req.user!.id);
+  const column = await getWritableColumn(req.params.columnId, req.user!.id);
   if (!column) return res.status(404).json({ success: false, message: "Column not found" });
 
   const parsed = CreateCardSchema.safeParse({ ...req.body, columnId: req.params.columnId });
@@ -199,8 +368,8 @@ router.patch("/cards/:cardId/move", requireAuth, async (req: Request, res: Respo
   if (!columnId) return res.status(400).json({ success: false, message: "columnId required" });
   if (!Number.isInteger(order) || order < 0) return res.status(400).json({ success: false, message: "order must be a non-negative integer" });
 
-  const card = await getOwnedCard(req.params.cardId, req.user!.id);
-  const targetColumn = await getOwnedColumn(columnId, req.user!.id);
+  const card = await getWritableCard(req.params.cardId, req.user!.id);
+  const targetColumn = await getWritableColumn(columnId, req.user!.id);
   if (!card || !targetColumn) return res.status(404).json({ success: false, message: "Card or column not found" });
 
   if (updates !== undefined) {
@@ -213,8 +382,8 @@ router.patch("/cards/:cardId/move", requireAuth, async (req: Request, res: Respo
         return res.status(400).json({ success: false, message: "updates must include id, columnId, and non-negative order" });
       }
 
-      const updateCard = await getOwnedCard(update.id, req.user!.id);
-      const updateColumn = await getOwnedColumn(update.columnId, req.user!.id);
+      const updateCard = await getWritableCard(update.id, req.user!.id);
+      const updateColumn = await getWritableColumn(update.columnId, req.user!.id);
       if (!updateCard || !updateColumn) {
         return res.status(404).json({ success: false, message: "Card or column not found" });
       }
@@ -236,7 +405,7 @@ router.patch("/cards/:cardId/move", requireAuth, async (req: Request, res: Respo
 });
 
 router.patch("/cards/:cardId", requireAuth, async (req: Request, res: Response) => {
-  const card = await getOwnedCard(req.params.cardId, req.user!.id);
+  const card = await getWritableCard(req.params.cardId, req.user!.id);
   if (!card) return res.status(404).json({ success: false, message: "Card not found" });
 
   const parsed = UpdateCardSchema.safeParse(req.body);
@@ -258,7 +427,7 @@ router.patch("/cards/:cardId", requireAuth, async (req: Request, res: Response) 
 });
 
 router.patch("/cards/:cardId/labels", requireAuth, async (req: Request, res: Response) => {
-  const cardBoard = await getCardBoard(req.params.cardId, req.user!.id);
+  const cardBoard = await getWritableCardBoard(req.params.cardId, req.user!.id);
   if (!cardBoard) return res.status(404).json({ success: false, message: "Card not found" });
 
   const labelIds = req.body.labelIds;
@@ -292,7 +461,7 @@ router.patch("/cards/:cardId/labels", requireAuth, async (req: Request, res: Res
 });
 
 router.delete("/cards/:cardId", requireAuth, async (req: Request, res: Response) => {
-  const card = await getOwnedCard(req.params.cardId, req.user!.id);
+  const card = await getWritableCard(req.params.cardId, req.user!.id);
   if (!card) return res.status(404).json({ success: false, message: "Card not found" });
 
   const deleted = await db.delete(schema.cards).where(eq(schema.cards.id, req.params.cardId)).returning();
@@ -303,7 +472,7 @@ router.delete("/cards/:cardId", requireAuth, async (req: Request, res: Response)
 
 // Comments
 router.get("/cards/:cardId/comments", requireAuth, async (req: Request, res: Response) => {
-  const card = await getOwnedCard(req.params.cardId, req.user!.id);
+  const card = await getReadableCard(req.params.cardId, req.user!.id);
   if (!card) return res.status(404).json({ success: false, message: "Card not found" });
 
   const comments = await db.select().from(schema.comments).where(eq(schema.comments.cardId, req.params.cardId));
@@ -311,7 +480,7 @@ router.get("/cards/:cardId/comments", requireAuth, async (req: Request, res: Res
 });
 
 router.post("/cards/:cardId/comments", requireAuth, async (req: Request, res: Response) => {
-  const card = await getOwnedCard(req.params.cardId, req.user!.id);
+  const card = await getWritableCard(req.params.cardId, req.user!.id);
   if (!card) return res.status(404).json({ success: false, message: "Card not found" });
 
   const parsed = CreateCommentSchema.safeParse({
