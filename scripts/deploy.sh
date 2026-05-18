@@ -61,6 +61,12 @@ echo "  Skip DB:   $SKIP_DOCKER"
 echo "========================================"
 echo ""
 
+# Disable corepack to avoid ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING (Node 20 bug)
+if command -v corepack &>/dev/null; then
+  info "Disabling corepack (known Node 20 incompatibility with pnpm) ..."
+  corepack disable &>/dev/null || true
+fi
+
 # ─── 1. Pre-flight checks ─────────────────────────────────────────
 
 install_via_apt() {
@@ -112,20 +118,27 @@ check_node() {
 
 # pnpm
 check_pnpm() {
+  local pnpm_ver=""
+
   if command -v pnpm &>/dev/null; then
-    PNPM_VER=$(pnpm -v | cut -d. -f1)
-    if [ "$PNPM_VER" -lt "$PNPM_MIN" ]; then
-      err "pnpm $PNPM_MIN+ required. Found: $(pnpm -v)"
-      exit 1
-    fi
+    pnpm_ver=$(pnpm -v 2>/dev/null | cut -d. -f1) || true
+  fi
+
+  if [ -n "$pnpm_ver" ] && [ "$pnpm_ver" -ge "$PNPM_MIN" ]; then
+    ok "pnpm $(pnpm -v) found."
+    return
+  fi
+
+  if [ -n "$pnpm_ver" ]; then
+    warn "pnpm $(pnpm -v 2>/dev/null || echo 'unknown') is outdated or broken."
+  fi
+
+  if ask_yn "Install pnpm globally via npm?"; then
+    npm install -g pnpm@9
+    ok "pnpm $(pnpm -v) installed."
   else
-    if ask_yn "pnpm not found. Install pnpm globally via npm?"; then
-      npm install -g pnpm@9
-      ok "pnpm $(pnpm -v) installed."
-    else
-      err "Please install pnpm $PNPM_MIN+ manually and re-run."
-      exit 1
-    fi
+    err "Please install pnpm $PNPM_MIN+ manually and re-run."
+    exit 1
   fi
 }
 
