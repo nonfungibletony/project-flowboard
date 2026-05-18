@@ -573,6 +573,91 @@ body {
   border-color: #111827;
 }
 
+.attachment-modal {
+  max-width: 560px;
+}
+
+.attachment-upload {
+  align-items: center;
+  background: #f9fafb;
+  border: 1px dashed #cbd5e1;
+  border-radius: 6px;
+  color: #374151;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.9rem;
+  font-weight: 600;
+  justify-content: center;
+  margin-bottom: 1rem;
+  padding: 0.65rem 0.9rem;
+}
+
+.attachment-upload input {
+  display: none;
+}
+
+.attachment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.attachment-row {
+  align-items: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  padding: 0.65rem;
+}
+
+.attachment-preview,
+.attachment-file-icon {
+  border-radius: 6px;
+  height: 64px;
+  width: 64px;
+}
+
+.attachment-preview {
+  object-fit: cover;
+}
+
+.attachment-file-icon {
+  align-items: center;
+  background: #eef2ff;
+  color: #3730a3;
+  display: flex;
+  font-size: 0.8rem;
+  font-weight: 700;
+  justify-content: center;
+}
+
+.attachment-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.attachment-info a {
+  color: #111827;
+  font-size: 0.9rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+
+.attachment-info a:hover {
+  text-decoration: underline;
+}
+
+.attachment-info span {
+  color: #6b7280;
+  font-size: 0.75rem;
+}
+
 /* Auth pages */
 .auth-container {
   min-height: 100vh;

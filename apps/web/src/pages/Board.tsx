@@ -17,7 +17,7 @@ export function Board() {
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [isInviting, setIsInviting] = useState(false)
   const { board, members, isLoading: boardLoading, error: boardError, inviteMember, removeMember } = useBoard(boardId!)
-  const { columns, labels, isLoading: columnsLoading, error, createColumn, createCard, moveCard, deleteCard, createLabel, setCardLabels, setCardDueDate } = useColumns(boardId!)
+  const { columns, labels, isLoading: columnsLoading, error, createColumn, createCard, moveCard, deleteCard, createLabel, setCardLabels, setCardDueDate, getCardAttachments, uploadCardAttachment, deleteCardAttachment } = useColumns(boardId!)
 
   const canEdit = board?.role === 'owner' || board?.role === 'editor'
   const isOwner = board?.role === 'owner'
@@ -129,6 +129,9 @@ export function Board() {
               onCreateLabel={createLabel}
               onSetCardLabels={(cardId, labelIds) => setCardLabels(cardId, column.id, labelIds)}
               onSetCardDueDate={(cardId, dueDate) => setCardDueDate(cardId, column.id, dueDate)}
+              onGetCardAttachments={(cardId) => getCardAttachments(cardId, column.id)}
+              onUploadCardAttachment={(cardId, file) => uploadCardAttachment(cardId, column.id, file)}
+              onDeleteCardAttachment={(cardId, attachmentId) => deleteCardAttachment(cardId, column.id, attachmentId)}
             />
           ))}
           {canEdit && showAddColumn ? (

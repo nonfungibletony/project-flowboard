@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Draggable, Droppable } from '@hello-pangea/dnd'
-import type { Column as ColumnType, Card, Label } from '@group/shared'
+import type { Attachment, Column as ColumnType, Card, Label } from '@group/shared'
 import { DeleteCardModal } from './DeleteCardModal'
 
 interface Props {
@@ -12,11 +12,14 @@ interface Props {
   onCreateLabel: (name: string, colour: string) => Promise<Label>
   onSetCardLabels: (cardId: string, labelIds: string[]) => Promise<unknown>
   onSetCardDueDate: (cardId: string, dueDate: string | null) => Promise<unknown>
+  onGetCardAttachments: (cardId: string) => Promise<Attachment[]>
+  onUploadCardAttachment: (cardId: string, file: File) => Promise<Attachment>
+  onDeleteCardAttachment: (cardId: string, attachmentId: string) => Promise<unknown>
 }
 
 const LABEL_COLOURS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899']
 
-export function Column({ column, labels, canEdit, onAddCard, onDeleteCard, onCreateLabel, onSetCardLabels, onSetCardDueDate }: Props) {
+export function Column({ column, labels, canEdit, onAddCard, onDeleteCard, onCreateLabel, onSetCardLabels, onSetCardDueDate, onGetCardAttachments, onUploadCardAttachment, onDeleteCardAttachment }: Props) {
   const [showAdd, setShowAdd] = useState(false)
   const [newCardTitle, setNewCardTitle] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -33,6 +36,12 @@ export function Column({ column, labels, canEdit, onAddCard, onDeleteCard, onCre
   const [dueDateValue, setDueDateValue] = useState('')
   const [dueDateError, setDueDateError] = useState<string | null>(null)
   const [isSavingDueDate, setIsSavingDueDate] = useState(false)
+  const [attachmentCard, setAttachmentCard] = useState<Card | null>(null)
+  const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [attachmentError, setAttachmentError] = useState<string | null>(null)
+  const [isLoadingAttachments, setIsLoadingAttachments] = useState(false)
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
+  const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null)
 
   const handleAdd = async () => {
     if (!newCardTitle.trim()) return
@@ -132,6 +141,59 @@ export function Column({ column, labels, canEdit, onAddCard, onDeleteCard, onCre
     }
   }
 
+  const openAttachments = async (card: Card) => {
+    setAttachmentCard(card)
+    setAttachments(card.attachments || [])
+    setAttachmentError(null)
+    setIsLoadingAttachments(true)
+
+    try {
+      const loaded = await onGetCardAttachments(card.id)
+      setAttachments(loaded)
+      setAttachmentCard({ ...card, attachments: loaded })
+    } catch (err) {
+      setAttachmentError(err instanceof Error ? err.message : 'Unable to load attachments')
+    } finally {
+      setIsLoadingAttachments(false)
+    }
+  }
+
+  const handleUploadAttachment = async (file: File | undefined) => {
+    if (!attachmentCard || !file) return
+
+    setAttachmentError(null)
+    setIsUploadingAttachment(true)
+
+    try {
+      const attachment = await onUploadCardAttachment(attachmentCard.id, file)
+      const nextAttachments = [...attachments, attachment]
+      setAttachments(nextAttachments)
+      setAttachmentCard({ ...attachmentCard, attachments: nextAttachments })
+    } catch (err) {
+      setAttachmentError(err instanceof Error ? err.message : 'Unable to upload attachment')
+    } finally {
+      setIsUploadingAttachment(false)
+    }
+  }
+
+  const handleDeleteAttachment = async (attachmentId: string) => {
+    if (!attachmentCard) return
+
+    setAttachmentError(null)
+    setDeletingAttachmentId(attachmentId)
+
+    try {
+      await onDeleteCardAttachment(attachmentCard.id, attachmentId)
+      const nextAttachments = attachments.filter((attachment) => attachment.id !== attachmentId)
+      setAttachments(nextAttachments)
+      setAttachmentCard({ ...attachmentCard, attachments: nextAttachments })
+    } catch (err) {
+      setAttachmentError(err instanceof Error ? err.message : 'Unable to delete attachment')
+    } finally {
+      setDeletingAttachmentId(null)
+    }
+  }
+
   return (
     <div className="column">
       <div className="column-header">
@@ -170,6 +232,12 @@ export function Column({ column, labels, canEdit, onAddCard, onDeleteCard, onCre
                         <div className="card-title">{card.title}</div>
                         <div className="card-meta">
                           {card.comments?.length || 0} comment{(card.comments?.length || 0) !== 1 ? 's' : ''}
+                          {!!card.attachments?.length && (
+                            <>
+                              {' · '}
+                              {card.attachments.length} file{card.attachments.length !== 1 ? 's' : ''}
+                            </>
+                          )}
                         </div>
                         {card.dueDate && (
                           <span className={`due-date-badge ${getDueDateStatus(card.dueDate)}`}>
@@ -177,8 +245,20 @@ export function Column({ column, labels, canEdit, onAddCard, onDeleteCard, onCre
                           </span>
                         )}
                       </div>
-                      {canEdit && !card.id.startsWith('temp-') && (
+                      {!card.id.startsWith('temp-') && (
                         <div className="card-actions">
+                          <button
+                            type="button"
+                            className="card-action-btn"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openAttachments(card)
+                            }}
+                          >
+                            Files
+                          </button>
+                          {canEdit && (
+                            <>
                           <button
                             type="button"
                             className="card-action-btn"
@@ -211,6 +291,8 @@ export function Column({ column, labels, canEdit, onAddCard, onDeleteCard, onCre
                           >
                             Delete
                           </button>
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
@@ -364,6 +446,66 @@ export function Column({ column, labels, canEdit, onAddCard, onDeleteCard, onCre
           </div>
         </div>
       )}
+      {attachmentCard && (
+        <div className="modal-overlay" onClick={isUploadingAttachment || deletingAttachmentId ? undefined : () => setAttachmentCard(null)}>
+          <div className="modal attachment-modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Attachments</h2>
+            <p className="modal-copy">{attachmentCard.title}</p>
+            {canEdit && (
+              <label className="attachment-upload">
+                <span>{isUploadingAttachment ? 'Uploading...' : 'Choose file'}</span>
+                <input
+                  type="file"
+                  onChange={(e) => {
+                    handleUploadAttachment(e.target.files?.[0])
+                    e.target.value = ''
+                  }}
+                  disabled={isUploadingAttachment}
+                />
+              </label>
+            )}
+            {attachmentError && <p className="form-error">{attachmentError}</p>}
+            {isLoadingAttachments ? (
+              <p className="modal-copy">Loading files...</p>
+            ) : attachments.length ? (
+              <div className="attachment-list">
+                {attachments.map((attachment) => (
+                  <div key={attachment.id} className="attachment-row">
+                    {attachment.mimeType.startsWith('image/') ? (
+                      <img className="attachment-preview" src={attachment.fileUrl} alt={attachment.fileName} />
+                    ) : (
+                      <div className="attachment-file-icon">{getFileInitials(attachment.fileName)}</div>
+                    )}
+                    <div className="attachment-info">
+                      <a href={attachment.fileUrl} target="_blank" rel="noreferrer">
+                        {attachment.fileName}
+                      </a>
+                      <span>{formatFileSize(attachment.fileSize)}</span>
+                    </div>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        className="card-action-btn card-delete-btn"
+                        onClick={() => handleDeleteAttachment(attachment.id)}
+                        disabled={deletingAttachmentId === attachment.id}
+                      >
+                        {deletingAttachmentId === attachment.id ? 'Deleting...' : 'Delete'}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="modal-copy">No files attached.</p>
+            )}
+            <div className="modal-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setAttachmentCard(null)} disabled={isUploadingAttachment || !!deletingAttachmentId}>
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -387,4 +529,15 @@ function getDueDateStatus(value: string) {
   if (dueDay < todayDay) return 'due-date-overdue'
   if (dueDay === todayDay) return 'due-date-today'
   return 'due-date-upcoming'
+}
+
+function formatFileSize(size: number) {
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function getFileInitials(fileName: string) {
+  const ext = fileName.split('.').pop()
+  return (ext || 'file').slice(0, 3).toUpperCase()
 }

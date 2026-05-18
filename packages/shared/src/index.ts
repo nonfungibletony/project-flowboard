@@ -98,9 +98,10 @@ export const CardSchema = z.object({
   updatedAt: z.string().datetime(),
   comments: z.array(z.any()).optional(),
   labels: z.array(LabelSchema).optional(),
+  attachments: z.array(z.any()).optional(),
 });
 
-export const CreateCardSchema = CardSchema.omit({ id: true, order: true, createdAt: true, updatedAt: true, comments: true, labels: true });
+export const CreateCardSchema = CardSchema.omit({ id: true, order: true, createdAt: true, updatedAt: true, comments: true, labels: true, attachments: true });
 export const UpdateCardSchema = z.object({
   title: z.string().min(1).max(500).optional(),
   description: z.string().max(5000).optional(),
@@ -126,6 +127,20 @@ export const CreateCommentSchema = CommentSchema.omit({ id: true, createdAt: tru
 
 export type Comment = z.infer<typeof CommentSchema>;
 export type CreateComment = z.infer<typeof CreateCommentSchema>;
+
+// Attachment
+export const AttachmentSchema = z.object({
+  id: z.string().uuid(),
+  cardId: z.string().uuid(),
+  fileName: z.string().min(1).max(255),
+  fileUrl: z.string().min(1),
+  fileSize: z.number().int().min(0),
+  mimeType: z.string().min(1).max(255),
+  uploadedBy: z.string().uuid(),
+  createdAt: z.string().datetime(),
+});
+
+export type Attachment = z.infer<typeof AttachmentSchema>;
 
 // API Response helper
 export const ApiResponseSchema = <T extends z.ZodTypeAny>(dataSchema: T) =>

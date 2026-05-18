@@ -1,10 +1,45 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
+import fs from "node:fs/promises";
+import path from "node:path";
+import crypto from "node:crypto";
+import multer from "multer";
 import { CreateBoardSchema, UpdateBoardSchema, CreateColumnSchema, CreateCardSchema, UpdateCardSchema, CreateCommentSchema, CreateLabelSchema, InviteBoardMemberSchema } from "@group/shared";
 import { db, schema } from "@group/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
+const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
+// MVP storage: local disk. The DB stores metadata and a served file URL.
+const ATTACHMENT_DIR = path.resolve(process.cwd(), "uploads", "attachments");
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: async (_req, _file, cb) => {
+      try {
+        await fs.mkdir(ATTACHMENT_DIR, { recursive: true });
+        cb(null, ATTACHMENT_DIR);
+      } catch (err) {
+        cb(err as Error, ATTACHMENT_DIR);
+      }
+    },
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname);
+      cb(null, `${crypto.randomUUID()}${ext}`);
+    },
+  }),
+  limits: { fileSize: MAX_ATTACHMENT_SIZE },
+});
+
+function uploadAttachment(req: Request, res: Response, next: NextFunction) {
+  upload.single("file")(req, res, (err) => {
+    if (!err) return next();
+    if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
+      return res.status(413).json({ success: false, message: "Files must be 10 MB or smaller" });
+    }
+    return res.status(400).json({ success: false, message: "Unable to upload file" });
+  });
+}
 
 type BoardRole = "owner" | "editor" | "viewer";
 
@@ -103,6 +138,18 @@ async function getWritableCardBoard(cardId: string, userId: string) {
   if (!column) return null;
 
   return { card, boardId: column.boardId };
+}
+
+async function getWritableAttachment(attachmentId: string, userId: string) {
+  const attachment = await db
+    .select()
+    .from(schema.attachments)
+    .where(eq(schema.attachments.id, attachmentId))
+    .limit(1);
+
+  if (!attachment.length) return null;
+  const card = await getWritableCard(attachment[0].cardId, userId);
+  return card ? attachment[0] : null;
 }
 
 async function getLabelsByCardIds(cardIds: string[]) {
@@ -458,6 +505,61 @@ router.patch("/cards/:cardId/labels", requireAuth, async (req: Request, res: Res
   }
 
   res.json({ success: true, data: labels });
+});
+
+// Attachments
+router.get("/cards/:cardId/attachments", requireAuth, async (req: Request, res: Response) => {
+  const card = await getReadableCard(req.params.cardId, req.user!.id);
+  if (!card) return res.status(404).json({ success: false, message: "Card not found" });
+
+  const attachments = await db
+    .select()
+    .from(schema.attachments)
+    .where(eq(schema.attachments.cardId, req.params.cardId));
+  res.json({ success: true, data: attachments });
+});
+
+router.post("/cards/:cardId/attachments", requireAuth, uploadAttachment, async (req: Request, res: Response) => {
+  const card = await getWritableCard(req.params.cardId, req.user!.id);
+  if (!card) {
+    if (req.file) await fs.unlink(req.file.path).catch(() => undefined);
+    return res.status(404).json({ success: false, message: "Card not found" });
+  }
+
+  if (!req.file) return res.status(400).json({ success: false, message: "File is required" });
+
+  const inserted = await db
+    .insert(schema.attachments)
+    .values({
+      cardId: req.params.cardId,
+      fileName: req.file.originalname,
+      fileUrl: `/uploads/attachments/${req.file.filename}`,
+      fileSize: req.file.size,
+      mimeType: req.file.mimetype || "application/octet-stream",
+      uploadedBy: req.user!.id,
+    })
+    .returning();
+
+  res.status(201).json({ success: true, data: inserted[0] });
+});
+
+router.delete("/attachments/:id", requireAuth, async (req: Request, res: Response) => {
+  const attachment = await getWritableAttachment(req.params.id, req.user!.id);
+  if (!attachment) return res.status(404).json({ success: false, message: "Attachment not found" });
+
+  const deleted = await db
+    .delete(schema.attachments)
+    .where(eq(schema.attachments.id, req.params.id))
+    .returning();
+  if (!deleted.length) return res.status(404).json({ success: false, message: "Attachment not found" });
+
+  const filePath = path.resolve(process.cwd(), deleted[0].fileUrl.replace(/^\//, ""));
+  const relativePath = path.relative(ATTACHMENT_DIR, filePath);
+  if (relativePath && !relativePath.startsWith("..") && !path.isAbsolute(relativePath)) {
+    await fs.unlink(filePath).catch(() => undefined);
+  }
+
+  res.json({ success: true });
 });
 
 router.delete("/cards/:cardId", requireAuth, async (req: Request, res: Response) => {

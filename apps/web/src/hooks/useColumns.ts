@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import type { Card, Column, Label } from '@group/shared'
+import type { Attachment, Card, Column, Label } from '@group/shared'
 import { useAuthFetch } from './useAuth'
 
 export function useColumns(boardId: string) {
@@ -69,6 +69,7 @@ export function useColumns(boardId: string) {
       dueDate: null,
       comments: [],
       labels: [],
+      attachments: [],
     }
 
     setColumns((prev) =>
@@ -97,7 +98,7 @@ export function useColumns(boardId: string) {
       throw new Error(data.message || 'Unable to create card')
     }
 
-    const card = normalizeCard({ ...data.data, comments: [], labels: [] } as Card)
+    const card = normalizeCard({ ...data.data, comments: [], labels: [], attachments: [] } as Card)
     setColumns((prev) =>
       prev.map((col) =>
         col.id === columnId
@@ -142,7 +143,7 @@ export function useColumns(boardId: string) {
       throw new Error(data.message || 'Unable to move card')
     }
 
-    const savedCard = normalizeCard({ ...data.data, comments: movedCard.comments || [] } as Card)
+    const savedCard = normalizeCard({ ...data.data, comments: movedCard.comments || [], labels: movedCard.labels || [], attachments: movedCard.attachments || [] } as Card)
     setColumns((prev) =>
       prev.map((column) =>
         column.id === targetColumnId
@@ -272,14 +273,68 @@ export function useColumns(boardId: string) {
         column.id === columnId
           ? {
               ...column,
-              cards: (column.cards || []).map((card) => card.id === cardId ? { ...savedCard, labels: card.labels || [], comments: card.comments || [] } : card),
+              cards: (column.cards || []).map((card) => card.id === cardId ? { ...savedCard, labels: card.labels || [], comments: card.comments || [], attachments: card.attachments || [] } : card),
             }
           : column
       )
     )
   }
 
-  return { columns, labels, isLoading, error, createColumn, createCard, moveCard, deleteCard, createLabel, setCardLabels, setCardDueDate }
+  const getCardAttachments = async (cardId: string, columnId: string) => {
+    setError(null)
+
+    const res = await authFetch(`/api/boards/cards/${cardId}/attachments`)
+    const data = await res.json()
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Unable to load attachments')
+    }
+
+    const attachments = data.data as Attachment[]
+    setColumns(updateCard(columnId, cardId, (card) => ({ ...card, attachments })))
+    return attachments
+  }
+
+  const uploadCardAttachment = async (cardId: string, columnId: string, file: File) => {
+    setError(null)
+
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const res = await authFetch(`/api/boards/cards/${cardId}/attachments`, {
+      method: 'POST',
+      body: formData,
+    })
+    const data = await res.json()
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Unable to upload attachment')
+    }
+
+    const attachment = data.data as Attachment
+    setColumns(updateCard(columnId, cardId, (card) => ({ ...card, attachments: [...(card.attachments || []), attachment] })))
+    return attachment
+  }
+
+  const deleteCardAttachment = async (cardId: string, columnId: string, attachmentId: string) => {
+    setError(null)
+
+    const res = await authFetch(`/api/boards/attachments/${attachmentId}`, {
+      method: 'DELETE',
+    })
+    const data = await res.json()
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Unable to delete attachment')
+    }
+
+    setColumns(updateCard(columnId, cardId, (card) => ({
+      ...card,
+      attachments: (card.attachments || []).filter((attachment) => attachment.id !== attachmentId),
+    })))
+  }
+
+  return { columns, labels, isLoading, error, createColumn, createCard, moveCard, deleteCard, createLabel, setCardLabels, setCardDueDate, getCardAttachments, uploadCardAttachment, deleteCardAttachment }
 }
 
 function sortColumns(columns: Column[]) {
@@ -294,7 +349,16 @@ function normalizeColumn(column: Column) {
 }
 
 function normalizeCard(card: Card) {
-  return { ...card, comments: card.comments || [], labels: card.labels || [] }
+  return { ...card, comments: card.comments || [], labels: card.labels || [], attachments: card.attachments || [] }
+}
+
+function updateCard(columnId: string, cardId: string, updater: (card: Card) => Card) {
+  return (columns: Column[]) =>
+    columns.map((column) =>
+      column.id === columnId
+        ? { ...column, cards: (column.cards || []).map((card) => card.id === cardId ? updater(card) : card) }
+        : column
+    )
 }
 
 function sortCards(cards: Card[]) {
