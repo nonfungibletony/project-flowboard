@@ -1,4 +1,4 @@
-import { serial, uuid, varchar, timestamp, pgTable, integer, text, foreignKey } from "drizzle-orm/pg-core";
+import { serial, uuid, varchar, timestamp, pgTable, integer, text, foreignKey, primaryKey } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -34,6 +34,21 @@ export const cards = pgTable("cards", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+export const labels = pgTable("labels", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  boardId: uuid("board_id").notNull().references(() => boards.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 100 }).notNull(),
+  colour: varchar("colour", { length: 20 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const cardLabels = pgTable("card_labels", {
+  cardId: uuid("card_id").notNull().references(() => cards.id, { onDelete: "cascade" }),
+  labelId: uuid("label_id").notNull().references(() => labels.id, { onDelete: "cascade" }),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.cardId, table.labelId] }),
+}));
 
 export const comments = pgTable("comments", {
   id: uuid("id").defaultRandom().primaryKey(),

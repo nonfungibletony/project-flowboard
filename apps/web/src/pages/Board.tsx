@@ -13,7 +13,7 @@ export function Board() {
   const [isCreatingColumn, setIsCreatingColumn] = useState(false)
   const [moveError, setMoveError] = useState<string | null>(null)
   const { board, isLoading: boardLoading } = useBoard(boardId!)
-  const { columns, isLoading: columnsLoading, error, createColumn, createCard, moveCard, deleteCard } = useColumns(boardId!)
+  const { columns, labels, isLoading: columnsLoading, error, createColumn, createCard, moveCard, deleteCard, createLabel, setCardLabels } = useColumns(boardId!)
 
   const handleCreateColumn = async () => {
     if (!newColumnName.trim()) return
@@ -63,8 +63,11 @@ export function Board() {
             <Column
               key={column.id}
               column={column}
+              labels={labels}
               onAddCard={(title) => createCard(column.id, title)}
               onDeleteCard={(cardId) => deleteCard(cardId, column.id)}
+              onCreateLabel={createLabel}
+              onSetCardLabels={(cardId, labelIds) => setCardLabels(cardId, column.id, labelIds)}
             />
           ))}
           {showAddColumn ? (

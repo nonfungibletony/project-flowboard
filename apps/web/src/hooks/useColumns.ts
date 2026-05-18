@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import type { Card, Column } from '@group/shared'
+import type { Card, Column, Label } from '@group/shared'
 import { useAuthFetch } from './useAuth'
 
 export function useColumns(boardId: string) {
   const [columns, setColumns] = useState<Column[]>([])
+  const [labels, setLabels] = useState<Label[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const authFetch = useAuthFetch()
@@ -14,14 +15,20 @@ export function useColumns(boardId: string) {
     setIsLoading(true)
     setError(null)
 
-    authFetch(`/api/boards/${boardId}/columns`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (!data.success) {
-          throw new Error(data.message || 'Unable to load columns')
+    Promise.all([
+      authFetch(`/api/boards/${boardId}/columns`).then((r) => r.json()),
+      authFetch(`/api/boards/${boardId}/labels`).then((r) => r.json()),
+    ])
+      .then(([columnsData, labelsData]) => {
+        if (!columnsData.success) {
+          throw new Error(columnsData.message || 'Unable to load columns')
+        }
+        if (!labelsData.success) {
+          throw new Error(labelsData.message || 'Unable to load labels')
         }
 
-        setColumns(sortColumns((data.data ?? []).map(normalizeColumn)))
+        setColumns(sortColumns((columnsData.data ?? []).map(normalizeColumn)))
+        setLabels(labelsData.data ?? [])
         setIsLoading(false)
       })
       .catch((err) => {
@@ -60,6 +67,7 @@ export function useColumns(boardId: string) {
       createdAt: now,
       updatedAt: now,
       comments: [],
+      labels: [],
     }
 
     setColumns((prev) =>
@@ -88,7 +96,7 @@ export function useColumns(boardId: string) {
       throw new Error(data.message || 'Unable to create card')
     }
 
-    const card = normalizeCard({ ...data.data, comments: [] } as Card)
+    const card = normalizeCard({ ...data.data, comments: [], labels: [] } as Card)
     setColumns((prev) =>
       prev.map((col) =>
         col.id === columnId
@@ -169,7 +177,68 @@ export function useColumns(boardId: string) {
     }
   }
 
-  return { columns, isLoading, error, createColumn, createCard, moveCard, deleteCard }
+  const createLabel = async (name: string, colour: string) => {
+    setError(null)
+
+    const res = await authFetch(`/api/boards/${boardId}/labels`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, colour }),
+    })
+    const data = await res.json()
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Unable to create label')
+    }
+
+    const label = data.data as Label
+    setLabels((prev) => [...prev, label])
+    return label
+  }
+
+  const setCardLabels = async (cardId: string, columnId: string, labelIds: string[]) => {
+    setError(null)
+
+    const previousColumns = columns
+    const nextLabels = labels.filter((label) => labelIds.includes(label.id))
+
+    setColumns((prev) =>
+      prev.map((column) =>
+        column.id === columnId
+          ? {
+              ...column,
+              cards: (column.cards || []).map((card) => card.id === cardId ? { ...card, labels: nextLabels } : card),
+            }
+          : column
+      )
+    )
+
+    const res = await authFetch(`/api/boards/cards/${cardId}/labels`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ labelIds }),
+    })
+    const data = await res.json()
+
+    if (!res.ok || !data.success) {
+      setColumns(previousColumns)
+      throw new Error(data.message || 'Unable to update labels')
+    }
+
+    const savedLabels = data.data as Label[]
+    setColumns((prev) =>
+      prev.map((column) =>
+        column.id === columnId
+          ? {
+              ...column,
+              cards: (column.cards || []).map((card) => card.id === cardId ? { ...card, labels: savedLabels } : card),
+            }
+          : column
+      )
+    )
+  }
+
+  return { columns, labels, isLoading, error, createColumn, createCard, moveCard, deleteCard, createLabel, setCardLabels }
 }
 
 function sortColumns(columns: Column[]) {
@@ -184,7 +253,7 @@ function normalizeColumn(column: Column) {
 }
 
 function normalizeCard(card: Card) {
-  return { ...card, comments: card.comments || [] }
+  return { ...card, comments: card.comments || [], labels: card.labels || [] }
 }
 
 function sortCards(cards: Card[]) {

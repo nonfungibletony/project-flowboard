@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
-import { CreateBoardSchema, UpdateBoardSchema, CreateColumnSchema, CreateCardSchema, UpdateCardSchema, CreateCommentSchema } from "@group/shared";
+import { CreateBoardSchema, UpdateBoardSchema, CreateColumnSchema, CreateCardSchema, UpdateCardSchema, CreateCommentSchema, CreateLabelSchema } from "@group/shared";
 import { db, schema } from "@group/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
@@ -38,6 +38,36 @@ async function getOwnedCard(cardId: string, userId: string) {
   if (!card.length) return null;
   const column = await getOwnedColumn(card[0].columnId, userId);
   return column ? card[0] : null;
+}
+
+async function getCardBoard(cardId: string, userId: string) {
+  const card = await getOwnedCard(cardId, userId);
+  if (!card) return null;
+
+  const column = await getOwnedColumn(card.columnId, userId);
+  if (!column) return null;
+
+  return { card, boardId: column.boardId };
+}
+
+async function getLabelsByCardIds(cardIds: string[]) {
+  const labelsByCard = new Map<string, Array<typeof schema.labels.$inferSelect>>();
+  if (!cardIds.length) return labelsByCard;
+
+  const rows = await db
+    .select({
+      cardId: schema.cardLabels.cardId,
+      label: schema.labels,
+    })
+    .from(schema.cardLabels)
+    .innerJoin(schema.labels, eq(schema.cardLabels.labelId, schema.labels.id))
+    .where(inArray(schema.cardLabels.cardId, cardIds));
+
+  for (const row of rows) {
+    labelsByCard.set(row.cardId, [...(labelsByCard.get(row.cardId) || []), row.label]);
+  }
+
+  return labelsByCard;
 }
 
 // Boards
@@ -87,6 +117,31 @@ router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
+// Labels
+router.get("/:id/labels", requireAuth, async (req: Request, res: Response) => {
+  const board = await getOwnedBoard(req.params.id, req.user!.id);
+  if (!board) return res.status(404).json({ success: false, message: "Board not found" });
+
+  const labels = await db.select().from(schema.labels).where(eq(schema.labels.boardId, req.params.id));
+  res.json({ success: true, data: labels });
+});
+
+router.post("/:id/labels", requireAuth, async (req: Request, res: Response) => {
+  const board = await getOwnedBoard(req.params.id, req.user!.id);
+  if (!board) return res.status(404).json({ success: false, message: "Board not found" });
+
+  const parsed = CreateLabelSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ success: false, message: parsed.error.message });
+  }
+
+  const inserted = await db
+    .insert(schema.labels)
+    .values({ ...parsed.data, boardId: req.params.id })
+    .returning();
+  res.status(201).json({ success: true, data: inserted[0] });
+});
+
 // Columns
 router.get("/:id/columns", requireAuth, async (req: Request, res: Response) => {
   const board = await getOwnedBoard(req.params.id, req.user!.id);
@@ -96,7 +151,11 @@ router.get("/:id/columns", requireAuth, async (req: Request, res: Response) => {
   const colsWithCards = await Promise.all(
     cols.map(async (col) => {
       const cards = await db.select().from(schema.cards).where(eq(schema.cards.columnId, col.id));
-      return { ...col, cards };
+      const labelsByCard = await getLabelsByCardIds(cards.map((card) => card.id));
+      return {
+        ...col,
+        cards: cards.map((card) => ({ ...card, labels: labelsByCard.get(card.id) || [] })),
+      };
     })
   );
   res.json({ success: true, data: colsWithCards });
@@ -178,6 +237,40 @@ router.patch("/cards/:cardId", requireAuth, async (req: Request, res: Response) 
   }
   const updated = await db.update(schema.cards).set(parsed.data).where(eq(schema.cards.id, req.params.cardId)).returning();
   res.json({ success: true, data: updated[0] });
+});
+
+router.patch("/cards/:cardId/labels", requireAuth, async (req: Request, res: Response) => {
+  const cardBoard = await getCardBoard(req.params.cardId, req.user!.id);
+  if (!cardBoard) return res.status(404).json({ success: false, message: "Card not found" });
+
+  const labelIds = req.body.labelIds;
+  if (!Array.isArray(labelIds) || labelIds.some((id) => typeof id !== "string")) {
+    return res.status(400).json({ success: false, message: "labelIds must be an array of label IDs" });
+  }
+
+  const uniqueLabelIds = [...new Set(labelIds)];
+  const labels = uniqueLabelIds.length
+    ? await db
+        .select()
+        .from(schema.labels)
+        .where(and(inArray(schema.labels.id, uniqueLabelIds), eq(schema.labels.boardId, cardBoard.boardId)))
+    : [];
+
+  if (labels.length !== uniqueLabelIds.length) {
+    return res.status(400).json({ success: false, message: "All labels must belong to this board" });
+  }
+
+  await db.delete(schema.cardLabels).where(eq(schema.cardLabels.cardId, req.params.cardId));
+  if (uniqueLabelIds.length) {
+    await db.insert(schema.cardLabels).values(
+      uniqueLabelIds.map((labelId) => ({
+        cardId: req.params.cardId,
+        labelId,
+      }))
+    );
+  }
+
+  res.json({ success: true, data: labels });
 });
 
 router.delete("/cards/:cardId", requireAuth, async (req: Request, res: Response) => {

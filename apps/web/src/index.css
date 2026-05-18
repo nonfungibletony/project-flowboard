@@ -286,17 +286,50 @@ body {
   gap: 0.75rem;
 }
 
-.card-delete-btn {
+.card-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+
+.card-action-btn {
   border: none;
   background: transparent;
-  color: #b91c1c;
+  color: #6b7280;
   cursor: pointer;
   font-size: 0.75rem;
   padding: 0;
 }
 
+.card-action-btn:hover {
+  color: #374151;
+}
+
+.card-delete-btn {
+  color: #b91c1c;
+}
+
 .card-delete-btn:hover {
   color: #7f1d1d;
+}
+
+.card-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.card-label-chip {
+  border-radius: 999px;
+  color: white;
+  display: inline-flex;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1;
+  max-width: 120px;
+  padding: 0.25rem 0.45rem;
 }
 
 .card-title {
@@ -379,6 +412,68 @@ body {
 .inline-actions {
   display: flex;
   gap: 0.5rem;
+}
+
+.label-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.label-picker-row {
+  align-items: center;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+}
+
+.label-picker-row-selected {
+  border-color: #2563eb;
+  box-shadow: inset 0 0 0 1px #2563eb;
+}
+
+.label-colour {
+  border-radius: 999px;
+  display: inline-block;
+  height: 0.85rem;
+  width: 0.85rem;
+}
+
+.label-create {
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+.label-create input {
+  margin-bottom: 0;
+}
+
+.label-colour-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.label-colour-option {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  height: 1.5rem;
+  width: 1.5rem;
+}
+
+.label-colour-option-selected {
+  border-color: #111827;
 }
 
 /* Auth pages */

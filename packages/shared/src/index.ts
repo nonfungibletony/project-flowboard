@@ -53,6 +53,20 @@ export type Column = z.infer<typeof ColumnSchema>;
 export type CreateColumn = z.infer<typeof CreateColumnSchema>;
 export type UpdateColumn = z.infer<typeof UpdateColumnSchema>;
 
+// Label
+export const LabelSchema = z.object({
+  id: z.string().uuid(),
+  boardId: z.string().uuid(),
+  name: z.string().min(1).max(100),
+  colour: z.string().min(1).max(20),
+  createdAt: z.string().datetime(),
+});
+
+export const CreateLabelSchema = LabelSchema.omit({ id: true, boardId: true, createdAt: true });
+
+export type Label = z.infer<typeof LabelSchema>;
+export type CreateLabel = z.infer<typeof CreateLabelSchema>;
+
 // Card
 export const CardSchema = z.object({
   id: z.string().uuid(),
@@ -63,9 +77,10 @@ export const CardSchema = z.object({
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   comments: z.array(z.any()).optional(),
+  labels: z.array(LabelSchema).optional(),
 });
 
-export const CreateCardSchema = CardSchema.omit({ id: true, order: true, createdAt: true, updatedAt: true, comments: true });
+export const CreateCardSchema = CardSchema.omit({ id: true, order: true, createdAt: true, updatedAt: true, comments: true, labels: true });
 export const UpdateCardSchema = z.object({
   title: z.string().min(1).max(500).optional(),
   description: z.string().max(5000).optional(),
