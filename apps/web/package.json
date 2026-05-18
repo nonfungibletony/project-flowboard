@@ -12,6 +12,7 @@
   "dependencies": {
     "@clerk/clerk-react": "^5.0.0",
     "@group/shared": "workspace:*",
+    "@hello-pangea/dnd": "^18.0.1",
     "drizzle-orm": "^0.30.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",

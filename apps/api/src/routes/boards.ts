@@ -126,14 +126,43 @@ router.post("/columns/:columnId/cards", requireAuth, async (req: Request, res: R
 });
 
 router.patch("/cards/:cardId/move", requireAuth, async (req: Request, res: Response) => {
-  const { columnId } = req.body;
+  const { columnId, order, updates } = req.body;
   if (!columnId) return res.status(400).json({ success: false, message: "columnId required" });
+  if (!Number.isInteger(order) || order < 0) return res.status(400).json({ success: false, message: "order must be a non-negative integer" });
 
   const card = await getOwnedCard(req.params.cardId, req.user!.id);
   const targetColumn = await getOwnedColumn(columnId, req.user!.id);
   if (!card || !targetColumn) return res.status(404).json({ success: false, message: "Card or column not found" });
 
-  const updated = await db.update(schema.cards).set({ columnId }).where(eq(schema.cards.id, req.params.cardId)).returning();
+  if (updates !== undefined) {
+    if (!Array.isArray(updates)) {
+      return res.status(400).json({ success: false, message: "updates must be an array" });
+    }
+
+    for (const update of updates) {
+      if (!update?.id || !update?.columnId || !Number.isInteger(update.order) || update.order < 0) {
+        return res.status(400).json({ success: false, message: "updates must include id, columnId, and non-negative order" });
+      }
+
+      const updateCard = await getOwnedCard(update.id, req.user!.id);
+      const updateColumn = await getOwnedColumn(update.columnId, req.user!.id);
+      if (!updateCard || !updateColumn) {
+        return res.status(404).json({ success: false, message: "Card or column not found" });
+      }
+    }
+  }
+
+  const updated = await db.update(schema.cards).set({ columnId, order }).where(eq(schema.cards.id, req.params.cardId)).returning();
+  if (Array.isArray(updates)) {
+    for (const update of updates) {
+      if (update.id === req.params.cardId) continue;
+      await db
+        .update(schema.cards)
+        .set({ columnId: update.columnId, order: update.order })
+        .where(eq(schema.cards.id, update.id));
+    }
+  }
+
   res.json({ success: true, data: updated[0] });
 });
 

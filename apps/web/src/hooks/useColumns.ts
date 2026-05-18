@@ -102,7 +102,51 @@ export function useColumns(boardId: string) {
     return card
   }
 
-  return { columns, isLoading, error, createColumn, createCard }
+  const moveCard = async (cardId: string, sourceColumnId: string, targetColumnId: string, targetIndex: number) => {
+    setError(null)
+
+    const previousColumns = columns
+    const nextColumns = moveCardInColumns(previousColumns, cardId, sourceColumnId, targetColumnId, targetIndex)
+    if (nextColumns === previousColumns) return
+
+    const movedCard = nextColumns
+      .find((column) => column.id === targetColumnId)
+      ?.cards?.find((card) => card.id === cardId)
+
+    if (!movedCard) return
+
+    setColumns(nextColumns)
+
+    const res = await authFetch(`/api/boards/cards/${cardId}/move`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        columnId: targetColumnId,
+        order: movedCard.order,
+        updates: getCardOrderUpdates(nextColumns, sourceColumnId, targetColumnId),
+      }),
+    })
+    const data = await res.json()
+
+    if (!res.ok || !data.success) {
+      setColumns(previousColumns)
+      throw new Error(data.message || 'Unable to move card')
+    }
+
+    const savedCard = normalizeCard({ ...data.data, comments: movedCard.comments || [] } as Card)
+    setColumns((prev) =>
+      prev.map((column) =>
+        column.id === targetColumnId
+          ? {
+              ...column,
+              cards: sortCards((column.cards || []).map((card) => card.id === cardId ? savedCard : card)),
+            }
+          : column
+      )
+    )
+  }
+
+  return { columns, isLoading, error, createColumn, createCard, moveCard }
 }
 
 function sortColumns(columns: Column[]) {
@@ -130,4 +174,45 @@ function sortCards(cards: Card[]) {
 function getNextCardOrder(columns: Column[], columnId: string) {
   const cards = columns.find((column) => column.id === columnId)?.cards || []
   return cards.reduce((maxOrder, card) => Math.max(maxOrder, card.order), -1) + 1
+}
+
+function moveCardInColumns(columns: Column[], cardId: string, sourceColumnId: string, targetColumnId: string, targetIndex: number) {
+  let movedCard: Card | undefined
+  const nextColumns = columns.map((column) => {
+    if (column.id !== sourceColumnId) return column
+
+    const cards = (column.cards || []).filter((card) => {
+      if (card.id === cardId) {
+        movedCard = card
+        return false
+      }
+      return true
+    })
+
+    return { ...column, cards: reindexCards(cards) }
+  })
+
+  if (!movedCard) return columns
+
+  return nextColumns.map((column) => {
+    if (column.id !== targetColumnId) return column
+
+    const cards = [...(column.cards || [])]
+    cards.splice(targetIndex, 0, { ...movedCard, columnId: targetColumnId })
+    return { ...column, cards: reindexCards(cards) }
+  })
+}
+
+function reindexCards(cards: Card[]) {
+  return cards.map((card, index) => ({ ...card, order: index }))
+}
+
+function getCardOrderUpdates(columns: Column[], sourceColumnId: string, targetColumnId: string) {
+  return columns
+    .filter((column) => column.id === sourceColumnId || column.id === targetColumnId)
+    .flatMap((column) =>
+      (column.cards || [])
+        .filter((card) => !card.id.startsWith('temp-'))
+        .map((card) => ({ id: card.id, columnId: column.id, order: card.order }))
+    )
 }
