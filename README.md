@@ -64,9 +64,29 @@ pnpm dev
 - ✅ Create a board
 - ✅ Create columns in a board
 - ✅ Create cards in a column
-- ✅ Move cards between columns
+- ✅ Move cards between columns (drag and drop)
 - ✅ Edit card details
 - ✅ Comment on a card
+
+## Post-MVP (see GitHub Issues)
+
+- [ ] Add logout UI/UX button ([#11](https://github.com/nonfungibletony/project-flowboard/issues/11))
+- [ ] Evaluate httpOnly cookie session architecture ([#12](https://github.com/nonfungibletony/project-flowboard/issues/12))
+- [ ] Real-time updates (WebSockets or SSE)
+- [ ] Deploy (Vercel frontend + Railway/Fly.io backend)
+
+## API Routes
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `/health` | Health check |
+| GET/POST | `/api/boards` | List / create boards |
+| GET/POST | `/api/boards/:id/columns` | Get columns with cards / create column |
+| POST | `/api/boards/columns/:id/cards` | Create card |
+| PATCH | `/api/boards/cards/:id/move` | Move card to new column |
+| PATCH | `/api/boards/cards/:id` | Edit card |
+| GET/POST | `/api/boards/cards/:id/comments` | List / add comments |
+| GET | `/api/me` | Current user |
 
 ## Scripts
 
@@ -77,29 +97,6 @@ pnpm dev
 | `pnpm db:generate` | Generate Drizzle migrations |
 | `pnpm db:migrate` | Run Drizzle migrations |
 | `pnpm db:studio` | Open Drizzle Studio GUI |
-
-## API Routes
-
-| Method | Route | Description |
-|--------|-------|-------------|
-| GET | `/health` | Health check |
-| GET/POST | `/users` | List / create users |
-| GET/POST | `/boards` | List / create boards |
-| GET | `/boards/:id/columns` | Get columns with cards |
-| POST | `/boards/:id/columns` | Create column |
-| POST | `/columns/:id/cards` | Create card |
-| PATCH | `/cards/:id/move` | Move card to new column |
-| PATCH | `/cards/:id` | Edit card |
-| GET/POST | `/cards/:id/comments` | List / add comments |
-
-## Post-MVP (see GitHub Issues)
-
-- [ ] Add logout UI/UX button ([#11](https://github.com/nonfungibletony/project-flowboard/issues/11))
-- [ ] Evaluate httpOnly cookie session architecture ([#12](https://github.com/nonfungibletony/project-flowboard/issues/12))
-- [ ] Implement drag-and-drop (react-beautiful-dnd or @dnd-kit)
-- [ ] Add card detail modal with comments
-- [ ] Real-time updates (WebSockets or SSE)
-- [ ] Deploy (Vercel frontend + Railway/Fly.io backend)
 
 ## License
 
