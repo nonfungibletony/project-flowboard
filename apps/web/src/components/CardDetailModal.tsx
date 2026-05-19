@@ -9,9 +9,10 @@ interface Props {
   onClose: () => void
   onUpdate: (updates: { title?: string; description?: string }) => Promise<void>
   onAddComment: (content: string) => Promise<void>
+  onDeleteCard: (cardId: string) => Promise<void>
 }
 
-export function CardDetailModal({ card, comments, isLoading, error, onClose, onUpdate, onAddComment }: Props) {
+export function CardDetailModal({ card, comments, isLoading, error, onClose, onUpdate, onAddComment, onDeleteCard }: Props) {
   const [isEditing, setIsEditing] = useState(false)
   const [title, setTitle] = useState(card.title)
   const [description, setDescription] = useState(card.description || '')
@@ -74,6 +75,16 @@ export function CardDetailModal({ card, comments, isLoading, error, onClose, onU
     }
   }
 
+  const handleDelete = async () => {
+    if (!window.confirm('Delete this card? This cannot be undone.')) return
+    try {
+      await onDeleteCard(card.id)
+      onClose()
+    } catch (err) {
+      setUpdateError(err instanceof Error ? err.message : 'Failed to delete')
+    }
+  }
+
   const formatTime = (dateStr: string) => {
     const d = new Date(dateStr)
     return d.toLocaleString(undefined, {
@@ -128,12 +139,20 @@ export function CardDetailModal({ card, comments, isLoading, error, onClose, onU
               ) : (
                 <>
                   <h2>{card.title}</h2>
-                  <button
-                    className="btn btn-secondary btn-small"
-                    onClick={() => setIsEditing(true)}
-                  >
-                    Edit
-                  </button>
+                  <div className="inline-actions">
+                    <button
+                      className="btn btn-secondary btn-small"
+                      onClick={() => setIsEditing(true)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="btn btn-danger btn-small"
+                      onClick={handleDelete}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </>
               )}
             </div>

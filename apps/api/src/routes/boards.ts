@@ -121,6 +121,58 @@ router.post("/:id/columns", requireAuth, async (req: Request, res: Response) => 
   res.status(201).json({ success: true, data: inserted[0] });
 });
 
+router.patch("/columns/:columnId", requireAuth, async (req: Request, res: Response) => {
+  const column = await getOwnedColumn(req.params.columnId, req.user!.id);
+  if (!column) return res.status(404).json({ success: false, message: "Column not found" });
+
+  const { name } = req.body;
+  const updated = await db
+    .update(schema.columns)
+    .set({ name })
+    .where(eq(schema.columns.id, req.params.columnId))
+    .returning();
+  res.json({ success: true, data: updated[0] });
+});
+
+router.delete("/columns/:columnId", requireAuth, async (req: Request, res: Response) => {
+  const column = await getOwnedColumn(req.params.columnId, req.user!.id);
+  if (!column) return res.status(404).json({ success: false, message: "Column not found" });
+
+  // Delete cards first (due to FK constraint)
+  await db.delete(schema.cards).where(eq(schema.cards.columnId, req.params.columnId));
+  await db.delete(schema.columns).where(eq(schema.columns.id, req.params.columnId));
+  res.json({ success: true });
+});
+
+router.patch("/:id/columns/reorder", requireAuth, async (req: Request, res: Response) => {
+  const board = await getOwnedBoard(req.params.id, req.user!.id);
+  if (!board) return res.status(404).json({ success: false, message: "Board not found" });
+
+  const { updates } = req.body;
+  if (!Array.isArray(updates)) {
+    return res.status(400).json({ success: false, message: "updates must be an array of {id, order}" });
+  }
+
+  for (const update of updates) {
+    if (!update?.id || !Number.isInteger(update.order) || update.order < 0) {
+      return res.status(400).json({ success: false, message: "Each update must include id and non-negative order" });
+    }
+    const col = await getOwnedColumn(update.id, req.user!.id);
+    if (!col) {
+      return res.status(404).json({ success: false, message: "Column not found" });
+    }
+  }
+
+  for (const update of updates) {
+    await db
+      .update(schema.columns)
+      .set({ order: update.order })
+      .where(eq(schema.columns.id, update.id));
+  }
+
+  res.json({ success: true });
+});
+
 // Card routes via column
 router.post("/columns/:columnId/cards", requireAuth, async (req: Request, res: Response) => {
   const column = await getOwnedColumn(req.params.columnId, req.user!.id);
@@ -226,6 +278,14 @@ router.get("/cards/:cardId", requireAuth, async (req: Request, res: Response) =>
   if (!card) return res.status(404).json({ success: false, message: "Card not found" });
 
   res.json({ success: true, data: card });
+});
+
+router.delete("/cards/:cardId", requireAuth, async (req: Request, res: Response) => {
+  const card = await getOwnedCard(req.params.cardId, req.user!.id);
+  if (!card) return res.status(404).json({ success: false, message: "Card not found" });
+
+  await db.delete(schema.cards).where(eq(schema.cards.id, req.params.cardId));
+  res.json({ success: true });
 });
 
 export { router as boardRoutes };
