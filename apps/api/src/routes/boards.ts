@@ -42,7 +42,13 @@ async function getOwnedCard(cardId: string, userId: string) {
 
 // Boards
 router.get("/", requireAuth, async (req: Request, res: Response) => {
-  const boards = await db.select().from(schema.boards).where(eq(schema.boards.createdBy, req.user!.id));
+  const includeArchived = req.query.includeArchived === "1";
+  const boardsQuery = includeArchived
+    ? db.select().from(schema.boards).where(eq(schema.boards.createdBy, req.user!.id))
+    : db.select().from(schema.boards).where(
+        and(eq(schema.boards.createdBy, req.user!.id), eq(schema.boards.archived, 0))
+      );
+  const boards = await boardsQuery;
   res.json({ success: true, data: boards });
 });
 

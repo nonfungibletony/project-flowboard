@@ -12,6 +12,7 @@ export const boards = pgTable("boards", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: varchar("name", { length: 200 }).notNull(),
   description: varchar("description", { length: 500 }),
+  archived: integer("archived").notNull().default(0),
   createdBy: uuid("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

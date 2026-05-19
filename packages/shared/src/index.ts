@@ -21,13 +21,14 @@ export const BoardSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(200),
   description: z.string().max(500).optional(),
+  archived: z.number().int().min(0).max(1),
   createdBy: z.string().uuid(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
 
-export const CreateBoardSchema = BoardSchema.omit({ id: true, createdBy: true, createdAt: true, updatedAt: true });
-export const UpdateBoardSchema = CreateBoardSchema.partial();
+export const CreateBoardSchema = BoardSchema.omit({ id: true, createdBy: true, createdAt: true, updatedAt: true, archived: true });
+export const UpdateBoardSchema = CreateBoardSchema.partial().extend({ archived: z.number().int().min(0).max(1).optional() });
 
 export type Board = z.infer<typeof BoardSchema>;
 export type CreateBoard = z.infer<typeof CreateBoardSchema>;

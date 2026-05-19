@@ -6,8 +6,13 @@ interface UseBoardsResult {
   boards: Board[]
   isLoading: boolean
   error: Error | null
+  refresh: () => Promise<void>
   createBoard: (name: string, description?: string) => Promise<Board | null>
+  updateBoard: (id: string, updates: { name?: string; description?: string; archived?: number }) => Promise<void>
+  deleteBoard: (id: string) => Promise<void>
   isCreating: boolean
+  isUpdating: boolean
+  isDeleting: boolean
 }
 
 export function useBoards(): UseBoardsResult {
@@ -15,6 +20,9 @@ export function useBoards(): UseBoardsResult {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
   const [isCreating, setIsCreating] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const initialLoadDone = useRef(false)
 
   const authFetch = useAuthFetch()
@@ -40,6 +48,12 @@ export function useBoards(): UseBoardsResult {
       setIsLoading(false)
     }
   }, [authFetch])
+
+  const refresh = useCallback(async () => {
+    setIsRefreshing(true)
+    await fetchBoards()
+    setIsRefreshing(false)
+  }, [fetchBoards])
 
   useEffect(() => {
     if (!initialLoadDone.current) {
@@ -70,7 +84,6 @@ export function useBoards(): UseBoardsResult {
         if (!json.success) {
           throw new Error(json.message || 'Failed to create board')
         }
-        // Optimistically prepend the new board
         setBoards((prev) => [json.data, ...prev])
         return json.data
       } catch (e) {
@@ -83,5 +96,61 @@ export function useBoards(): UseBoardsResult {
     [authFetch]
   )
 
-  return { boards, isLoading, error, createBoard, isCreating }
+  // Update (rename / archive) a board
+  const updateBoard = useCallback(
+    async (id: string, updates: { name?: string; description?: string; archived?: number }) => {
+      setIsUpdating(true)
+      setError(null)
+      try {
+        const res = await authFetch(`/api/boards/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates),
+        })
+        const json = await res.json()
+        if (!res.ok) {
+          throw new Error(json.message || `Failed to update board (${res.status})`)
+        }
+        if (!json.success) {
+          throw new Error(json.message || 'Failed to update board')
+        }
+        setBoards((prev) => prev.map((b) => (b.id === id ? { ...b, ...updates, updatedAt: new Date().toISOString() } : b)))
+      } catch (e) {
+        setError(e instanceof Error ? e : new Error('Unknown error updating board'))
+        throw e
+      } finally {
+        setIsUpdating(false)
+      }
+    },
+    [authFetch]
+  )
+
+  // Delete a board
+  const deleteBoard = useCallback(
+    async (id: string) => {
+      setIsDeleting(true)
+      setError(null)
+      try {
+        const res = await authFetch(`/api/boards/${id}`, {
+          method: 'DELETE',
+        })
+        const json = await res.json()
+        if (!res.ok) {
+          throw new Error(json.message || `Failed to delete board (${res.status})`)
+        }
+        if (!json.success) {
+          throw new Error(json.message || 'Failed to delete board')
+        }
+        setBoards((prev) => prev.filter((b) => b.id !== id))
+      } catch (e) {
+        setError(e instanceof Error ? e : new Error('Unknown error deleting board'))
+        throw e
+      } finally {
+        setIsDeleting(false)
+      }
+    },
+    [authFetch]
+  )
+
+  return { boards, isLoading, error, refresh, createBoard, updateBoard, deleteBoard, isCreating, isUpdating, isDeleting }
 }

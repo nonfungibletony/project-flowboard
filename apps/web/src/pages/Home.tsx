@@ -5,26 +5,43 @@ import { useBoards } from '../hooks/useBoards'
 
 export function Home() {
   const [showModal, setShowModal] = useState(false)
-  const { boards, isLoading, error, createBoard, isCreating } = useBoards()
+  const [showArchived, setShowArchived] = useState(false)
+  const { boards, isLoading, error, refresh, createBoard, updateBoard, deleteBoard, isCreating, isUpdating, isDeleting } = useBoards()
 
   const handleCreate = async (name: string, description?: string) => {
     const result = await createBoard(name, description)
     return result
   }
 
+  const visibleBoards = showArchived
+    ? boards
+    : boards.filter((b) => b.archived !== 1)
+
   return (
     <div className="container">
       <div className="header">
-        <h1>My Boards</h1>
-        <button
-          className="btn btn-primary"
-          onClick={() => {
-            setShowModal(true)
-          }}
-          disabled={isCreating}
-        >
-          + New Board
-        </button>
+        <h1>My Boards ({visibleBoards.length})</h1>
+        <div className="header-actions">
+          <button
+            className="btn btn-secondary"
+            onClick={() => {
+              setShowArchived((prev) => !prev)
+              // refetch with archived included when toggling on
+              if (!showArchived) void refresh()
+            }}
+          >
+            {showArchived ? 'Hide Archived' : 'Show Archived'}
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              setShowModal(true)
+            }}
+            disabled={isCreating}
+          >
+            + New Board
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -38,15 +55,21 @@ export function Home() {
             Retry
           </button>
         </div>
-      ) : boards.length === 0 ? (
+      ) : visibleBoards.length === 0 ? (
         <div className="empty-state">
           <p>No boards yet.</p>
           <p>Click “+ New Board” to get started.</p>
         </div>
       ) : (
         <div className="board-grid">
-          {boards.map((board) => (
-            <BoardCard key={board.id} board={board} />
+          {visibleBoards.map((board) => (
+            <BoardCard
+              key={board.id}
+              board={board}
+              onRename={(id, name, desc) => updateBoard(id, { name, description: desc })}
+              onArchive={(id, archived) => updateBoard(id, { archived: archived ? 1 : 0 })}
+              onDelete={(id) => deleteBoard(id)}
+            />
           ))}
         </div>
       )}

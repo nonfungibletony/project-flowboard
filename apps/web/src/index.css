@@ -363,6 +363,13 @@ body {
   transition: transform 0.2s, box-shadow 0.2s;
   text-decoration: none;
   color: inherit;
+  position: relative;
+}
+
+.board-card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
 }
 
 .board-card:hover {
@@ -370,9 +377,51 @@ body {
   box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
 
-.board-card h3 {
+.board-card-editing {
+  cursor: default;
+}
+
+.board-card-archived {
+  opacity: 0.6;
+}
+
+.board-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   margin-bottom: 0.5rem;
+}
+
+.board-card h3 {
+  font-size: 1rem;
   color: #fafafa;
+}
+
+.board-card-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.board-card:hover .board-card-actions {
+  opacity: 1;
+}
+
+.board-card-editing .board-card-actions {
+  opacity: 1;
+}
+
+.btn-danger {
+  background: #7f1d1d;
+  color: #fee2e2;
+}
+
+.header-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
 }
 
 .board-card-desc {
@@ -393,6 +442,17 @@ body {
 .board-card-meta {
   font-size: 0.75rem;
   color: #71717a;
+}
+
+.board-card-editing input {
+  width: 100%;
+  padding: 0.55rem 0.6rem;
+  background: #09090b;
+  border: 1px solid #27272a;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+  color: #fafafa;
 }
 
 .loading-state,
