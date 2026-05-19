@@ -184,13 +184,6 @@ router.patch("/cards/:cardId", requireAuth, async (req: Request, res: Response) 
   res.json({ success: true, data: updated[0] });
 });
 
-router.get("/cards/:cardId", requireAuth, async (req: Request, res: Response) => {
-  const card = await getOwnedCard(req.params.cardId, req.user!.id);
-  if (!card) return res.status(404).json({ success: false, message: "Card not found" });
-
-  res.json({ success: true, data: card });
-});
-
 // Comments
 router.get("/cards/:cardId/comments", requireAuth, async (req: Request, res: Response) => {
   const card = await getOwnedCard(req.params.cardId, req.user!.id);
@@ -219,7 +212,14 @@ router.post("/cards/:cardId/comments", requireAuth, async (req: Request, res: Re
     return res.status(400).json({ success: false, message: parsed.error.message });
   }
   const inserted = await db.insert(schema.comments).values(parsed.data).returning();
-  res.status(201).json({ success: true, data: inserted[0] });
+  res.status(201).json({ success: true, data: { ...inserted[0], userName: req.user!.name || "User" } });
+});
+
+router.get("/cards/:cardId", requireAuth, async (req: Request, res: Response) => {
+  const card = await getOwnedCard(req.params.cardId, req.user!.id);
+  if (!card) return res.status(404).json({ success: false, message: "Card not found" });
+
+  res.json({ success: true, data: card });
 });
 
 export { router as boardRoutes };
