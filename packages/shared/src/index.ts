@@ -43,11 +43,8 @@ export const ColumnSchema = z.object({
   cards: z.array(z.any()).optional(),
 });
 
-export const CreateColumnSchema = ColumnSchema.omit({ id: true, createdAt: true, cards: true });
-export const UpdateColumnSchema = z.object({
-  name: z.string().min(1).max(200).optional(),
-  order: z.number().int().min(0).optional(),
-});
+export const CreateColumnSchema = ColumnSchema.omit({ id: true, createdAt: true, cards: true, order: true });
+export const UpdateColumnSchema = CreateColumnSchema.partial();
 
 export type Column = z.infer<typeof ColumnSchema>;
 export type CreateColumn = z.infer<typeof CreateColumnSchema>;

@@ -104,11 +104,14 @@ router.post("/:id/columns", requireAuth, async (req: Request, res: Response) => 
   const board = await getOwnedBoard(req.params.id, req.user!.id);
   if (!board) return res.status(404).json({ success: false, message: "Board not found" });
 
+  const existing = await db.select().from(schema.columns).where(eq(schema.columns.boardId, req.params.id));
+  const nextOrder = existing.reduce((max, col) => Math.max(max, col.order ?? 0), -1) + 1;
+
   const parsed = CreateColumnSchema.safeParse({ ...req.body, boardId: req.params.id });
   if (!parsed.success) {
     return res.status(400).json({ success: false, message: parsed.error.message });
   }
-  const inserted = await db.insert(schema.columns).values(parsed.data).returning();
+  const inserted = await db.insert(schema.columns).values({ ...parsed.data, order: nextOrder }).returning();
   res.status(201).json({ success: true, data: inserted[0] });
 });
 
@@ -117,11 +120,14 @@ router.post("/columns/:columnId/cards", requireAuth, async (req: Request, res: R
   const column = await getOwnedColumn(req.params.columnId, req.user!.id);
   if (!column) return res.status(404).json({ success: false, message: "Column not found" });
 
+  const existing = await db.select().from(schema.cards).where(eq(schema.cards.columnId, req.params.columnId));
+  const nextOrder = existing.reduce((max, c) => Math.max(max, c.order ?? 0), -1) + 1;
+
   const parsed = CreateCardSchema.safeParse({ ...req.body, columnId: req.params.columnId });
   if (!parsed.success) {
     return res.status(400).json({ success: false, message: parsed.error.message });
   }
-  const inserted = await db.insert(schema.cards).values(parsed.data).returning();
+  const inserted = await db.insert(schema.cards).values({ ...parsed.data, order: nextOrder }).returning();
   res.status(201).json({ success: true, data: inserted[0] });
 });
 
