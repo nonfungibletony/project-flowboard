@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import { HealthCheckSchema } from "@group/shared";
 import { boardRoutes } from "./routes/boards.js";
 import { userRoutes } from "./routes/users.js";
+import { workspaceRoutes } from "./routes/workspaces.js";
 import { requireAuth } from "./middleware/auth.js";
 
 dotenv.config();
@@ -29,6 +30,7 @@ app.get("/me", requireAuth, (req: Request, res: Response) => {
 
 app.use("/users", userRoutes);
 app.use("/boards", boardRoutes);
+app.use("/workspaces", workspaceRoutes);
 
 // Global error handler — prevents empty responses and hangs from unhandled async errors
 app.use((err: any, _req: Request, res: Response, _next: any) => {

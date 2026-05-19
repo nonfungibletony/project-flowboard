@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useUser } from '@clerk/clerk-react'
+import { useWorkspaces } from '../hooks/useWorkspaces'
 
 export function Sidebar() {
   const { user } = useUser()
+  const { workspaces, isLoading: wsLoading } = useWorkspaces()
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const searchRef = useRef<HTMLDivElement>(null)
@@ -32,6 +34,23 @@ export function Sidebar() {
               <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
+          {wsLoading ? (
+            <div className="workspace-switcher" style={{ fontSize: '12px', opacity: 0.5 }}>Loading workspaces…</div>
+          ) : (
+            <div className="workspace-switcher" style={{ fontSize: '12px', paddingBottom: '8px' }}>
+              {workspaces.map((ws) => (
+                <NavLink
+                  key={ws.id}
+                  to={`/workspaces/${ws.id}`}
+                  className={({ isActive }) => `nav-item nav-small${isActive ? ' active' : ''}`}
+                  style={{ paddingLeft: '16px', fontSize: '12px' }}
+                >
+                  <span className="workspace-dot" style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#999', marginRight: '6px' }} />
+                  {ws.name}
+                </NavLink>
+              ))}
+            </div>
+          )}
         </div>
         <nav className="sidebar-nav">
           <button className="nav-item" onClick={() => setSearchOpen(true)}>
