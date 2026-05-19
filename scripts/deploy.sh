@@ -65,6 +65,8 @@ echo ""
 if command -v corepack &>/dev/null; then
   info "Disabling corepack (known Node 20 incompatibility with pnpm) ..."
   corepack disable &>/dev/null || true
+  # Also remove cached corepack pnpm so it doesn't shadow the real binary
+  rm -rf /root/.cache/node/corepack/pnpm/ &>/dev/null || true
 fi
 
 # ─── 1. Pre-flight checks ─────────────────────────────────────────

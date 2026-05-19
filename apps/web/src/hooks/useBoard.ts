@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { Board } from '@group/shared'
-import { useAuthFetch } from './useAuth'
+import { useAuthFetch, safeJson } from './useAuth'
 
 export function useBoard(boardId: string) {
   const [board, setBoard] = useState<Board | null>(null)
@@ -10,7 +10,7 @@ export function useBoard(boardId: string) {
   useEffect(() => {
     if (!boardId) return
     authFetch(`/api/boards/${boardId}`)
-      .then((r) => r.json())
+      .then((r) => safeJson(r))
       .then((data) => {
         setBoard(data.data || null)
         setIsLoading(false)

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Board } from '@group/shared'
-import { useAuthFetch } from './useAuth'
+import { useAuthFetch, safeJson } from './useAuth'
 
 interface UseBoardsResult {
   boards: Board[]
@@ -32,7 +32,7 @@ export function useBoards(): UseBoardsResult {
     setError(null)
     try {
       const res = await authFetch('/api/boards?includeArchived=1')
-      const json = await res.json()
+      const json = await safeJson(res)
       if (!res.ok) {
         throw new Error(json.message || `Failed to load boards (${res.status})`)
       }
@@ -74,7 +74,7 @@ export function useBoards(): UseBoardsResult {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: name.trim(), description: description?.trim() || undefined }),
         })
-        const json = await res.json()
+        const json = await safeJson(res)
         if (!res.ok) {
           throw new Error(json.message || `Failed to create board (${res.status})`)
         }
@@ -104,7 +104,7 @@ export function useBoards(): UseBoardsResult {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updates),
         })
-        const json = await res.json()
+        const json = await safeJson(res)
         if (!res.ok) {
           throw new Error(json.message || `Failed to update board (${res.status})`)
         }
@@ -131,7 +131,7 @@ export function useBoards(): UseBoardsResult {
         const res = await authFetch(`/api/boards/${id}`, {
           method: 'DELETE',
         })
-        const json = await res.json()
+        const json = await safeJson(res)
         if (!res.ok) {
           throw new Error(json.message || `Failed to delete board (${res.status})`)
         }

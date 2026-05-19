@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { Card, Comment } from '@group/shared'
-import { useAuthFetch } from './useAuth'
+import { useAuthFetch, safeJson } from './useAuth'
 
 export function useCardDetail(cardId: string | null) {
   const [card, setCard] = useState<Card | null>(null)
@@ -26,8 +26,8 @@ export function useCardDetail(cardId: string | null) {
         authFetch(`/api/boards/cards/${cardId}/comments`),
       ])
 
-      const cardData = await cardRes.json()
-      const commentsData = await commentsRes.json()
+      const cardData = await safeJson(cardRes)
+      const commentsData = await safeJson(commentsRes)
 
       if (!cardRes.ok || !cardData.success) {
         throw new Error(cardData.message || 'Unable to load card')
@@ -56,7 +56,7 @@ export function useCardDetail(cardId: string | null) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
       })
-      const data = await res.json()
+      const data = await safeJson(res)
 
       if (!res.ok || !data.success) {
         throw new Error(data.message || 'Unable to update card')
@@ -78,7 +78,7 @@ export function useCardDetail(cardId: string | null) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content }),
       })
-      const data = await res.json()
+      const data = await safeJson(res)
 
       if (!res.ok || !data.success) {
         throw new Error(data.message || 'Unable to add comment')

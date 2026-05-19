@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { Card, Column } from '@group/shared'
-import { useAuthFetch } from './useAuth'
+import { useAuthFetch, safeJson } from './useAuth'
 
 export function useColumns(boardId: string) {
   const [columns, setColumns] = useState<Column[]>([])
@@ -15,7 +15,7 @@ export function useColumns(boardId: string) {
     setError(null)
 
     authFetch(`/api/boards/${boardId}/columns`)
-      .then((r) => r.json())
+      .then((r) => safeJson(r))
       .then((data) => {
         if (!data.success) {
           throw new Error(data.message || 'Unable to load columns')
@@ -38,7 +38,7 @@ export function useColumns(boardId: string) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
     })
-    const data = await res.json()
+    const data = await safeJson(res)
 
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Unable to create column')
@@ -86,7 +86,7 @@ function uuid(): string {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title }),
     })
-    const data = await res.json()
+    const data = await safeJson(res)
 
     if (!res.ok || !data.success) {
       setColumns((prev) =>
@@ -132,7 +132,7 @@ function uuid(): string {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates),
     })
-    const data = await res.json()
+    const data = await safeJson(res)
 
     if (!res.ok || !data.success) {
       setColumns(previousColumns)
@@ -157,7 +157,7 @@ function uuid(): string {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content }),
     })
-    const data = await res.json()
+    const data = await safeJson(res)
 
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Unable to add comment')
@@ -201,7 +201,7 @@ function uuid(): string {
         updates: getCardOrderUpdates(nextColumns, sourceColumnId, targetColumnId),
       }),
     })
-    const data = await res.json()
+    const data = await safeJson(res)
 
     if (!res.ok || !data.success) {
       setColumns(previousColumns)

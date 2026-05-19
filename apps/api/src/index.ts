@@ -30,6 +30,14 @@ app.get("/me", requireAuth, (req: Request, res: Response) => {
 app.use("/users", userRoutes);
 app.use("/boards", boardRoutes);
 
+// Global error handler — prevents empty responses and hangs from unhandled async errors
+app.use((err: any, _req: Request, res: Response, _next: any) => {
+  console.error("Unhandled error:", err);
+  const message = err?.message || "Internal server error";
+  const status = typeof err?.status === "number" ? err.status : 500;
+  res.status(status).json({ success: false, message });
+});
+
 app.listen(PORT, () => {
   console.log(`API running on http://localhost:${PORT}`);
 });

@@ -40,14 +40,16 @@ export function Board() {
 
   const handleDragEnd = async (result: DropResult) => {
     const { destination, draggableId, source } = result
-    if (!destination) return
-    if (destination.droppableId === source.droppableId && destination.index === source.index) return
+    console.log('[D&D] drag end:', { draggableId, source: source.droppableId, sourceIndex: source.index, destination: destination?.droppableId, destIndex: destination?.index })
+    if (!destination) { console.log('[D&D] no destination, skipping'); return }
+    if (destination.droppableId === source.droppableId && destination.index === source.index) { console.log('[D&D] dropped in same place, skipping'); return }
 
     setMoveError(null)
 
     try {
       await moveCard(draggableId, source.droppableId, destination.droppableId, destination.index)
     } catch (err) {
+      console.error('[D&D] moveCard error:', err)
       setMoveError(err instanceof Error ? err.message : 'Unable to move card')
     }
   }

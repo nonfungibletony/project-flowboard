@@ -16,6 +16,17 @@ export function useAuthFetch() {
   return authFetch
 }
 
+/** Parse a fetch Response safely even when the body is empty or invalid JSON. */
+export async function safeJson(res: Response): Promise<any> {
+  const text = await res.text()
+  if (!text) return {}
+  try {
+    return JSON.parse(text)
+  } catch {
+    return { message: text.slice(0, 200) }
+  }
+}
+
 export function useUserMe() {
   const authFetch = useAuthFetch()
   const [user, setUser] = useState<{ id: string; clerkUserId: string; email: string; name: string } | null>(null)
