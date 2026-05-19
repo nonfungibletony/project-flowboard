@@ -596,6 +596,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  min-height: 80px;
 }
 
 .card {
