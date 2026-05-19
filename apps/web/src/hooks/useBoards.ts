@@ -22,7 +22,6 @@ export function useBoards(): UseBoardsResult {
   const [isCreating, setIsCreating] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [isRefreshing, setIsRefreshing] = useState(false)
   const initialLoadDone = useRef(false)
 
   const authFetch = useAuthFetch()
@@ -32,7 +31,7 @@ export function useBoards(): UseBoardsResult {
     setIsLoading(true)
     setError(null)
     try {
-      const res = await authFetch('/api/boards')
+      const res = await authFetch('/api/boards?includeArchived=1')
       const json = await res.json()
       if (!res.ok) {
         throw new Error(json.message || `Failed to load boards (${res.status})`)
@@ -50,9 +49,7 @@ export function useBoards(): UseBoardsResult {
   }, [authFetch])
 
   const refresh = useCallback(async () => {
-    setIsRefreshing(true)
     await fetchBoards()
-    setIsRefreshing(false)
   }, [fetchBoards])
 
   useEffect(() => {

@@ -6,7 +6,7 @@ import { useBoards } from '../hooks/useBoards'
 export function Home() {
   const [showModal, setShowModal] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
-  const { boards, isLoading, error, refresh, createBoard, updateBoard, deleteBoard, isCreating, isUpdating, isDeleting } = useBoards()
+  const { boards, isLoading, error, refresh, createBoard, updateBoard, deleteBoard, isCreating } = useBoards()
 
   const handleCreate = async (name: string, description?: string) => {
     const result = await createBoard(name, description)
