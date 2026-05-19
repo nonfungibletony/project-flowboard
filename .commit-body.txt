@@ -1,0 +1,20 @@
+fix(frontend+backend): safe JSON parsing and global error handling
+
+Frontend:
+- Introduce safeJson() in useAuth.ts: reads response as text first,
+  gracefully handles empty or invalid JSON bodies without crashing.
+- Replace all direct `await res.json()` calls in useBoards.ts,
+  useBoard.ts, useColumns.ts, useCardDetail.ts with safeJson().
+- Fixes: 'Unexpected end of JSON input' when API returns non-OK
+  responses with empty bodies (e.g. 500, 502, 401 from crashed proxy).
+
+Backend:
+- Add Express global error-handling middleware in index.ts to catch
+  unhandled async errors and respond with { success: false, message }
+  instead of hanging or returning an empty body.
+
+Deploy script:
+- Purge corepack cached pnpm after `corepack disable` to prevent
+  shadowing the real pnpm binary under Node 20.19.2.
+
+Build passes cleanly. TypeScript zero errors in project src/.

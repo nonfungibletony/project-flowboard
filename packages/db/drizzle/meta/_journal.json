@@ -8,6 +8,13 @@
       "when": 1779003864460,
       "tag": "0000_dusty_zodiak",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1779003864461,
+      "tag": "0001_add_archived_to_boards",
+      "breakpoints": true
     }
   ]
 }
