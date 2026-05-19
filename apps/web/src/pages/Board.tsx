@@ -5,6 +5,7 @@ import { Column } from '../components/Column'
 import { CardDetailModal } from '../components/CardDetailModal'
 import { useBoard } from '../hooks/useBoard'
 import { useColumns } from '../hooks/useColumns'
+import { useCardDetail } from '../hooks/useCardDetail'
 import type { Card } from '@group/shared'
 
 export function Board() {
@@ -14,10 +15,11 @@ export function Board() {
   const [columnError, setColumnError] = useState<string | null>(null)
   const [isCreatingColumn, setIsCreatingColumn] = useState(false)
   const [moveError, setMoveError] = useState<string | null>(null)
-  const [selectedCard, setSelectedCard] = useState<Card | null>(null)
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
 
   const { board, isLoading: boardLoading } = useBoard(boardId!)
-  const { columns, isLoading: columnsLoading, error, createColumn, createCard, updateCard, addComment, moveCard } = useColumns(boardId!)
+  const { columns, isLoading: columnsLoading, error, createColumn, createCard, updateCard: updateCardInColumns, addComment: addCommentInColumns, moveCard } = useColumns(boardId!)
+  const { card, comments, isLoading: detailLoading, error: detailError, updateCard, addComment } = useCardDetail(selectedCardId)
 
   const handleCreateColumn = async () => {
     if (!newColumnName.trim()) return
@@ -51,22 +53,23 @@ export function Board() {
   }
 
   const handleCardClick = (card: Card) => {
-    setSelectedCard(card)
+    setSelectedCardId(card.id)
   }
 
   const handleCloseModal = () => {
-    setSelectedCard(null)
+    setSelectedCardId(null)
   }
 
   const handleUpdateCard = async (updates: { title?: string; description?: string }) => {
-    if (!selectedCard) return
-    await updateCard(selectedCard.id, updates)
-    setSelectedCard((prev) => (prev ? { ...prev, ...updates, updatedAt: new Date().toISOString() } : null))
+    if (!selectedCardId) return
+    await updateCard(updates)
+    await updateCardInColumns(selectedCardId, updates)
   }
 
   const handleAddComment = async (content: string) => {
-    if (!selectedCard) return
-    await addComment(selectedCard.id, content)
+    if (!selectedCardId) return
+    await addComment(content)
+    await addCommentInColumns(selectedCardId, content)
   }
 
   if (boardLoading || columnsLoading) return <p>Loading...</p>
@@ -135,12 +138,12 @@ export function Board() {
         </div>
       </DragDropContext>
 
-      {selectedCard && (
+      {selectedCardId && card && (
         <CardDetailModal
-          card={selectedCard}
-          comments={selectedCard.comments || []}
-          isLoading={false}
-          error={null}
+          card={card}
+          comments={comments}
+          isLoading={detailLoading}
+          error={detailError}
           onClose={handleCloseModal}
           onUpdate={handleUpdateCard}
           onAddComment={handleAddComment}

@@ -2,8 +2,11 @@ import { Router, Request, Response } from "express";
 import { CreateUserSchema, UpdateUserSchema } from "@group/shared";
 import { db, schema } from "@group/db";
 import { eq } from "drizzle-orm";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
+
+router.use(requireAuth);
 
 router.get("/", async (_req: Request, res: Response) => {
   const users = await db.select().from(schema.users);
