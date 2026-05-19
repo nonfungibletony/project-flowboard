@@ -561,7 +561,7 @@ body {
   gap: 1rem;
   overflow-x: auto;
   padding-bottom: 1rem;
-  align-items: flex-start;
+  align-items: stretch;
 }
 
 .column {
@@ -573,7 +573,7 @@ body {
   padding: 0.75rem;
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 180px);
+  height: calc(100vh - 180px);
 }
 
 .column-header {
