@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
 import { useParams } from 'react-router-dom'
 import { Column } from '../components/Column'
@@ -38,7 +38,7 @@ export function Board() {
     }
   }
 
-  const handleDragEnd = async (result: DropResult) => {
+  const handleDragEnd = useCallback(async (result: DropResult) => {
     const { destination, draggableId, source } = result
     console.log('[D&D] drag end:', { draggableId, source: source.droppableId, sourceIndex: source.index, destination: destination?.droppableId, destIndex: destination?.index })
     if (!destination) { console.log('[D&D] no destination, skipping'); return }
@@ -52,7 +52,7 @@ export function Board() {
       console.error('[D&D] moveCard error:', err)
       setMoveError(err instanceof Error ? err.message : 'Unable to move card')
     }
-  }
+  }, [moveCard])
 
   const handleCardClick = (card: Card) => {
     setSelectedCardId(card.id)
