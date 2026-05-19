@@ -8,26 +8,23 @@ export function useColumns(boardId: string) {
   const [error, setError] = useState<string | null>(null)
   const authFetch = useAuthFetch()
 
-  useEffect(() => {
+  const refresh = async () => {
     if (!boardId) return
-
     setIsLoading(true)
     setError(null)
+    try {
+      const data = await safeJson(await authFetch(`/api/boards/${boardId}/columns`))
+      if (!data.success) throw new Error(data.message || 'Unable to load columns')
+      setColumns(sortColumns((data.data ?? []).map(normalizeColumn)))
+    } catch (err: any) {
+      setError(err instanceof Error ? err.message : 'Unable to load columns')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
-    authFetch(`/api/boards/${boardId}/columns`)
-      .then((r) => safeJson(r))
-      .then((data) => {
-        if (!data.success) {
-          throw new Error(data.message || 'Unable to load columns')
-        }
-
-        setColumns(sortColumns((data.data ?? []).map(normalizeColumn)))
-        setIsLoading(false)
-      })
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : 'Unable to load columns')
-        setIsLoading(false)
-      })
+  useEffect(() => {
+    refresh()
   }, [authFetch, boardId])
 
   const createColumn = async (name: string) => {
@@ -221,7 +218,65 @@ function uuid(): string {
     )
   }
 
-  return { columns, isLoading, error, createColumn, createCard, updateCard, addComment, moveCard }
+  const reorderColumns = async (sourceIndex: number, destinationIndex: number) => {
+    if (sourceIndex === destinationIndex) return
+    setError(null)
+
+    const previousColumns = columns
+    const next = [...previousColumns]
+    const [moved] = next.splice(sourceIndex, 1)
+    next.splice(destinationIndex, 0, moved)
+    const reindexed = next.map((col, index) => ({ ...col, order: index }))
+    setColumns(reindexed)
+
+    const updates = reindexed.map((col) => ({ id: col.id, order: col.order }))
+    const res = await authFetch(`/api/boards/${boardId}/columns/reorder`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updates }),
+    })
+    const data = await safeJson(res)
+
+    if (!res.ok || !data.success) {
+      setColumns(previousColumns)
+      throw new Error(data.message || 'Unable to reorder columns')
+    }
+  }
+
+  const deleteColumn = async (columnId: string) => {
+    setError(null)
+    const previousColumns = columns
+    setColumns((prev) => prev.filter((col) => col.id !== columnId))
+
+    const res = await authFetch(`/api/boards/columns/${columnId}`, { method: 'DELETE' })
+    const data = await safeJson(res)
+
+    if (!res.ok || !data.success) {
+      setColumns(previousColumns)
+      throw new Error(data.message || 'Unable to delete column')
+    }
+  }
+
+  const deleteCard = async (cardId: string) => {
+    setError(null)
+    const previousColumns = columns.map((col) => ({ ...col, cards: [...(col.cards || [])] }))
+    setColumns((prev) =>
+      prev.map((col) => ({
+        ...col,
+        cards: (col.cards || []).filter((card) => card.id !== cardId),
+      }))
+    )
+
+    const res = await authFetch(`/api/boards/cards/${cardId}`, { method: 'DELETE' })
+    const data = await safeJson(res)
+
+    if (!res.ok || !data.success) {
+      setColumns(previousColumns)
+      throw new Error(data.message || 'Unable to delete card')
+    }
+  }
+
+  return { columns, isLoading, error, createColumn, createCard, updateCard, addComment, moveCard, reorderColumns, deleteColumn, deleteCard }
 }
 
 function sortColumns(columns: Column[]) {
