@@ -1,20 +1,30 @@
-feat(workspaces): implement workspace entity and CRUD UI (#42 #49)
+feat(members): workspace-scoped member management (#44)
 
 Backend
-- Add workspaces table to schema (id, name, slug, created_by, timestamps)
-- Add workspace_id nullable FK to boards with CASCADE delete
-- Migration 0002_add_workspaces.sql + journal entry
-- New API route: /api/workspaces (GET, POST, GET /:id, GET /:id/boards, PATCH, DELETE)
-- Register /workspaces in API entrypoint
-
-Shared
-- Add WorkspaceSchema, CreateWorkspaceSchema, UpdateWorkspaceSchema
+- New table: workspace_members (workspace_id FK, user_id FK, role, timestamps)
+  - Unique constraint on (workspace_id, user_id) to prevent duplicates
+- Migration: 0003_add_workspace_members.sql + journal entry
+- Shared types: WorkspaceMemberSchema, CreateWorkspaceMemberSchema
+- New API route: workspace-members.ts
+  - GET /api/workspaces/:id/members — owners and members can view
+  - POST /api/workspaces/:id/members — owner only; adds by email
+    - Idempotent: returns existing member if already added
+    - Validates user exists in system first
+  - DELETE /api/workspaces/:id/members/:memberId — owner only
+- Wired into index.ts under /workspaces/:id/members
 
 Frontend
-- New hook: useWorkspaces (load, create, update, delete with optimistic updates)
-- Rewrite Workspaces page with real API: list, create inline, rename inline, delete
-- Sidebar: display workspace list under header with links to /workspaces/:id
-- vite.config.ts: allow flowboard.castiel.com.au in preview.allowedHosts (#50)
+- New hook: useMembers(workspaceId?) — load, add by email, remove
+- Rewrite Members page:
+  - Workspace selector dropdown
+  - Add member by email with validation hint
+  - Member list with name, email, role badge, remove button
+  - Handles empty states, loading, errors
+- CSS: .member-actions, .form-label, .form-select, .hint-text
 
-Closes #42
-Closes #49
+Security
+- Only workspace owners can add/remove members
+- All existing members can view the member list
+- MVP assumption: all members have full access (role persisted but not enforced)
+
+Closes #44

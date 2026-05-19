@@ -110,6 +110,20 @@ export type Workspace = z.infer<typeof WorkspaceSchema>;
 export type CreateWorkspace = z.infer<typeof CreateWorkspaceSchema>;
 export type UpdateWorkspace = z.infer<typeof UpdateWorkspaceSchema>;
 
+// Workspace Member
+export const WorkspaceMemberSchema = z.object({
+  id: z.string().uuid(),
+  workspaceId: z.string().uuid(),
+  userId: z.string().uuid(),
+  role: z.string().min(1).max(50),
+  createdAt: z.string().datetime(),
+});
+
+export const CreateWorkspaceMemberSchema = WorkspaceMemberSchema.omit({ id: true, createdAt: true });
+
+export type WorkspaceMember = z.infer<typeof WorkspaceMemberSchema>;
+export type CreateWorkspaceMember = z.infer<typeof CreateWorkspaceMemberSchema>;
+
 // API Response helper
 export const ApiResponseSchema = <T extends z.ZodTypeAny>(dataSchema: T) =>
   z.object({
