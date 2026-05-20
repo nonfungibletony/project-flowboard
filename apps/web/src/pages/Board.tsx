@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { DragDropContext, Draggable, Droppable, type DropResult } from '@hello-pangea/dnd'
 import { useParams } from 'react-router-dom'
-import type { Card, Column as ColumnType } from '@group/shared'
+import type { Activity, Card, Column as ColumnType } from '@group/shared'
 import { Column } from '../components/Column'
 import { useBoard } from '../hooks/useBoard'
 import { useColumns } from '../hooks/useColumns'
+import { useAuthFetch } from '../hooks/useAuth'
 
 export function Board() {
   const { boardId } = useParams()
@@ -22,6 +23,11 @@ export function Board() {
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([])
   const [dueFrom, setDueFrom] = useState('')
   const [dueTo, setDueTo] = useState('')
+  const [showActivity, setShowActivity] = useState(false)
+  const [activities, setActivities] = useState<Activity[]>([])
+  const [activityError, setActivityError] = useState<string | null>(null)
+  const [isLoadingActivities, setIsLoadingActivities] = useState(false)
+  const authFetch = useAuthFetch()
   const { board, members, isLoading: boardLoading, error: boardError, inviteMember, removeMember } = useBoard(boardId!)
   const { columns, labels, isLoading: columnsLoading, error, createColumn, createCard, moveCard, reorderColumns, deleteCard, createLabel, setCardLabels, setCardDueDate, getCardAttachments, uploadCardAttachment, deleteCardAttachment, getCardChecklists, createChecklist, deleteChecklist, createChecklistItem, updateChecklistItem, reorderChecklistItems, deleteChecklistItem } = useColumns(boardId!)
 
@@ -36,6 +42,30 @@ export function Board() {
     return () => window.clearTimeout(timeout)
   }, [searchInput])
 
+  const loadActivities = async () => {
+    if (!boardId) return
+
+    setActivityError(null)
+    setIsLoadingActivities(true)
+
+    try {
+      const res = await authFetch(`/api/boards/${boardId}/activities`)
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Unable to load activity')
+      }
+      setActivities(data.data ?? [])
+    } catch (err) {
+      setActivityError(err instanceof Error ? err.message : 'Unable to load activity')
+    } finally {
+      setIsLoadingActivities(false)
+    }
+  }
+
+  useEffect(() => {
+    loadActivities()
+  }, [authFetch, boardId])
+
   const handleCreateColumn = async () => {
     if (!newColumnName.trim()) return
 
@@ -44,6 +74,7 @@ export function Board() {
 
     try {
       await createColumn(newColumnName.trim())
+      loadActivities()
       setNewColumnName('')
       setShowAddColumn(false)
     } catch (err) {
@@ -69,6 +100,7 @@ export function Board() {
       }
 
       await moveCard(draggableId, source.droppableId, destination.droppableId, destination.index)
+      loadActivities()
     } catch (err) {
       setMoveError(err instanceof Error ? err.message : 'Unable to move item')
     }
@@ -115,6 +147,9 @@ export function Board() {
           <h1>{board?.name || 'Board'}</h1>
           {board?.description && <p style={{ color: '#6b7280', marginTop: '0.25rem' }}>{board.description}</p>}
         </div>
+        <button type="button" className="btn btn-secondary" onClick={() => setShowActivity(true)}>
+          Activity
+        </button>
         <div className="member-strip">
           {members.map((member) => (
             <div key={member.userId} className="member-pill" title={`${member.name} (${member.role})`}>
@@ -150,7 +185,7 @@ export function Board() {
         </div>
       )}
 
-      {(boardError || error || moveError || inviteError) && <p className="page-error">{inviteError || moveError || error || boardError}</p>}
+      {(boardError || error || moveError || inviteError || activityError) && <p className="page-error">{inviteError || moveError || error || boardError || activityError}</p>}
 
       <div className="board-filters">
         <div className="filter-row">
@@ -213,11 +248,19 @@ export function Board() {
                         canDrag={canEdit && !hasFilters}
                         searchTerm={searchTerm}
                         columnDragHandleProps={dragProvided.dragHandleProps}
-                        onAddCard={(title) => createCard(column.id, title)}
+                        onAddCard={async (title) => {
+                          const card = await createCard(column.id, title)
+                          loadActivities()
+                          return card
+                        }}
                         onDeleteCard={(cardId) => deleteCard(cardId, column.id)}
                         onCreateLabel={createLabel}
                         onSetCardLabels={(cardId, labelIds) => setCardLabels(cardId, column.id, labelIds)}
-                        onSetCardDueDate={(cardId, dueDate) => setCardDueDate(cardId, column.id, dueDate)}
+                        onSetCardDueDate={async (cardId, dueDate) => {
+                          const updated = await setCardDueDate(cardId, column.id, dueDate)
+                          loadActivities()
+                          return updated
+                        }}
                         onGetCardAttachments={(cardId) => getCardAttachments(cardId, column.id)}
                         onUploadCardAttachment={(cardId, file) => uploadCardAttachment(cardId, column.id, file)}
                         onDeleteCardAttachment={(cardId, attachmentId) => deleteCardAttachment(cardId, column.id, attachmentId)}
@@ -280,6 +323,40 @@ export function Board() {
           )}
         </Droppable>
       </DragDropContext>
+      {showActivity && (
+        <div className="modal-overlay" onClick={() => setShowActivity(false)}>
+          <div className="modal activity-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="activity-header">
+              <h2>Activity</h2>
+              <button type="button" className="btn btn-secondary btn-small" onClick={loadActivities} disabled={isLoadingActivities}>
+                Refresh
+              </button>
+            </div>
+            {isLoadingActivities ? (
+              <p className="modal-copy">Loading activity...</p>
+            ) : activities.length ? (
+              <div className="activity-list">
+                {activities.map((activity) => (
+                  <div key={activity.id} className="activity-item">
+                    <div className="activity-dot" />
+                    <div>
+                      <p>{formatActivity(activity)}</p>
+                      <span>{new Date(activity.createdAt).toLocaleString()}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="modal-copy">No activity yet.</p>
+            )}
+            <div className="modal-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setShowActivity(false)}>
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -326,4 +403,28 @@ function cardMatchesFilters(card: Card, searchTerm: string, selectedLabelIds: st
   }
 
   return true
+}
+
+function formatActivity(activity: Activity) {
+  const actor = activity.userName || 'Someone'
+  const metadata = activity.metadata || {}
+  const cardTitle = typeof metadata.cardTitle === 'string' ? metadata.cardTitle : 'a card'
+  const columnName = typeof metadata.columnName === 'string' ? metadata.columnName : 'a column'
+  const fromColumnName = typeof metadata.fromColumnName === 'string' ? metadata.fromColumnName : 'another column'
+  const toColumnName = typeof metadata.toColumnName === 'string' ? metadata.toColumnName : 'another column'
+
+  switch (activity.actionType) {
+    case 'created_column':
+      return `${actor} added column ${columnName}`
+    case 'created_card':
+      return `${actor} created ${cardTitle} in ${columnName}`
+    case 'moved_card':
+      return `${actor} moved ${cardTitle} from ${fromColumnName} to ${toColumnName}`
+    case 'updated_card':
+      return `${actor} updated ${cardTitle}`
+    case 'added_comment':
+      return `${actor} commented on ${cardTitle}`
+    default:
+      return `${actor} performed ${activity.actionType}`
+  }
 }

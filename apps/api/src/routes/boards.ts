@@ -5,7 +5,7 @@ import crypto from "node:crypto";
 import multer from "multer";
 import { CreateBoardSchema, UpdateBoardSchema, CreateColumnSchema, CreateCardSchema, UpdateCardSchema, CreateCommentSchema, CreateLabelSchema, InviteBoardMemberSchema, CreateChecklistSchema, CreateChecklistItemSchema, UpdateChecklistItemSchema } from "@group/shared";
 import { db, schema } from "@group/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
@@ -42,6 +42,24 @@ function uploadAttachment(req: Request, res: Response, next: NextFunction) {
 }
 
 type BoardRole = "owner" | "editor" | "viewer";
+
+async function logActivity(input: {
+  boardId: string;
+  userId: string;
+  actionType: string;
+  entityType: string;
+  entityId: string;
+  metadata?: Record<string, unknown>;
+}) {
+  await db.insert(schema.activities).values({
+    boardId: input.boardId,
+    userId: input.userId,
+    actionType: input.actionType,
+    entityType: input.entityType,
+    entityId: input.entityId,
+    metadata: input.metadata || {},
+  });
+}
 
 async function getBoardRole(boardId: string, userId: string): Promise<BoardRole | null> {
   const board = await db
@@ -296,6 +314,31 @@ router.get("/templates", requireAuth, async (_req: Request, res: Response) => {
   res.json({ success: true, data: templates });
 });
 
+router.get("/:id/activities", requireAuth, async (req: Request, res: Response) => {
+  const access = await getReadableBoard(req.params.id, req.user!.id);
+  if (!access) return res.status(404).json({ success: false, message: "Board not found" });
+
+  const activities = await db
+    .select({
+      id: schema.activities.id,
+      boardId: schema.activities.boardId,
+      userId: schema.activities.userId,
+      actionType: schema.activities.actionType,
+      entityType: schema.activities.entityType,
+      entityId: schema.activities.entityId,
+      metadata: schema.activities.metadata,
+      createdAt: schema.activities.createdAt,
+      userName: schema.users.name,
+    })
+    .from(schema.activities)
+    .innerJoin(schema.users, eq(schema.activities.userId, schema.users.id))
+    .where(eq(schema.activities.boardId, req.params.id))
+    .orderBy(desc(schema.activities.createdAt))
+    .limit(50);
+
+  res.json({ success: true, data: activities });
+});
+
 router.get("/:id", requireAuth, async (req: Request, res: Response) => {
   const access = await getReadableBoard(req.params.id, req.user!.id);
   if (!access) return res.status(404).json({ success: false, message: "Board not found" });
@@ -481,6 +524,14 @@ router.post("/:id/columns", requireAuth, async (req: Request, res: Response) => 
     return res.status(400).json({ success: false, message: parsed.error.message });
   }
   const inserted = await db.insert(schema.columns).values(parsed.data).returning();
+  await logActivity({
+    boardId: req.params.id,
+    userId: req.user!.id,
+    actionType: "created_column",
+    entityType: "column",
+    entityId: inserted[0].id,
+    metadata: { columnName: inserted[0].name },
+  });
   res.status(201).json({ success: true, data: inserted[0] });
 });
 
@@ -538,6 +589,14 @@ router.post("/columns/:columnId/cards", requireAuth, async (req: Request, res: R
         : new Date(parsed.data.dueDate),
   };
   const inserted = await db.insert(schema.cards).values(values).returning();
+  await logActivity({
+    boardId: column.boardId,
+    userId: req.user!.id,
+    actionType: "created_card",
+    entityType: "card",
+    entityId: inserted[0].id,
+    metadata: { cardTitle: inserted[0].title, columnName: column.name },
+  });
   res.status(201).json({ success: true, data: inserted[0] });
 });
 
@@ -549,6 +608,7 @@ router.patch("/cards/:cardId/move", requireAuth, async (req: Request, res: Respo
   const card = await getWritableCard(req.params.cardId, req.user!.id);
   const targetColumn = await getWritableColumn(columnId, req.user!.id);
   if (!card || !targetColumn) return res.status(404).json({ success: false, message: "Card or column not found" });
+  const sourceColumn = await db.select().from(schema.columns).where(eq(schema.columns.id, card.columnId)).limit(1);
 
   if (updates !== undefined) {
     if (!Array.isArray(updates)) {
@@ -579,6 +639,19 @@ router.patch("/cards/:cardId/move", requireAuth, async (req: Request, res: Respo
     }
   }
 
+  await logActivity({
+    boardId: targetColumn.boardId,
+    userId: req.user!.id,
+    actionType: "moved_card",
+    entityType: "card",
+    entityId: req.params.cardId,
+    metadata: {
+      cardTitle: card.title,
+      fromColumnName: sourceColumn[0]?.name,
+      toColumnName: targetColumn.name,
+    },
+  });
+
   res.json({ success: true, data: updated[0] });
 });
 
@@ -601,6 +674,17 @@ router.patch("/cards/:cardId", requireAuth, async (req: Request, res: Response) 
   };
 
   const updated = await db.update(schema.cards).set(values).where(eq(schema.cards.id, req.params.cardId)).returning();
+  const column = await db.select().from(schema.columns).where(eq(schema.columns.id, updated[0].columnId)).limit(1);
+  if (column[0]) {
+    await logActivity({
+      boardId: column[0].boardId,
+      userId: req.user!.id,
+      actionType: "updated_card",
+      entityType: "card",
+      entityId: updated[0].id,
+      metadata: { cardTitle: updated[0].title },
+    });
+  }
   res.json({ success: true, data: updated[0] });
 });
 
@@ -842,6 +926,17 @@ router.post("/cards/:cardId/comments", requireAuth, async (req: Request, res: Re
     return res.status(400).json({ success: false, message: parsed.error.message });
   }
   const inserted = await db.insert(schema.comments).values(parsed.data).returning();
+  const column = await db.select().from(schema.columns).where(eq(schema.columns.id, card.columnId)).limit(1);
+  if (column[0]) {
+    await logActivity({
+      boardId: column[0].boardId,
+      userId: req.user!.id,
+      actionType: "added_comment",
+      entityType: "comment",
+      entityId: inserted[0].id,
+      metadata: { cardTitle: card.title },
+    });
+  }
   res.status(201).json({ success: true, data: inserted[0] });
 });
 

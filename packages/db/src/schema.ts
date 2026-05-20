@@ -102,3 +102,14 @@ export const checklistItems = pgTable("checklist_items", {
   completed: boolean("completed").default(false).notNull(),
   order: integer("order").notNull().default(0),
 });
+
+export const activities = pgTable("activities", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  boardId: uuid("board_id").notNull().references(() => boards.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  actionType: varchar("action_type", { length: 100 }).notNull(),
+  entityType: varchar("entity_type", { length: 100 }).notNull(),
+  entityId: uuid("entity_id").notNull(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

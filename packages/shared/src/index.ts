@@ -189,6 +189,21 @@ export const UpdateChecklistItemSchema = z.object({
 export type Checklist = z.infer<typeof ChecklistSchema>;
 export type ChecklistItem = z.infer<typeof ChecklistItemSchema>;
 
+// Activity
+export const ActivitySchema = z.object({
+  id: z.string().uuid(),
+  boardId: z.string().uuid(),
+  userId: z.string().uuid(),
+  actionType: z.string().min(1).max(100),
+  entityType: z.string().min(1).max(100),
+  entityId: z.string().uuid(),
+  metadata: z.record(z.any()).nullable().optional(),
+  createdAt: z.string().datetime(),
+  userName: z.string().optional(),
+});
+
+export type Activity = z.infer<typeof ActivitySchema>;
+
 // API Response helper
 export const ApiResponseSchema = <T extends z.ZodTypeAny>(dataSchema: T) =>
   z.object({

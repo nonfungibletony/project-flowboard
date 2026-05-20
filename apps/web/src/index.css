@@ -833,6 +833,57 @@ body {
   font-size: 0.75rem;
 }
 
+.activity-modal {
+  max-width: 560px;
+}
+
+.activity-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.activity-header h2 {
+  margin-bottom: 0;
+}
+
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-bottom: 1.25rem;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.activity-item {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: auto 1fr;
+}
+
+.activity-dot {
+  background: #2563eb;
+  border-radius: 999px;
+  height: 0.55rem;
+  margin-top: 0.4rem;
+  width: 0.55rem;
+}
+
+.activity-item p {
+  color: #111827;
+  font-size: 0.9rem;
+  line-height: 1.35;
+  margin-bottom: 0.15rem;
+}
+
+.activity-item span {
+  color: #6b7280;
+  font-size: 0.75rem;
+}
+
 .checklist-modal {
   max-width: 640px;
 }

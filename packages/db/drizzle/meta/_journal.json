@@ -50,6 +50,13 @@
       "when": 1779136089371,
       "tag": "0006_spooky_mandroid",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1779237766255,
+      "tag": "0007_wealthy_sandman",
+      "breakpoints": true
     }
   ]
 }
