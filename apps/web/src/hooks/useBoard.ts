@@ -81,5 +81,22 @@ export function useBoard(boardId: string) {
     }
   }
 
-  return { board, members, isLoading, error, inviteMember, removeMember }
+  const updateBoard = async (updates: Partial<Pick<Board, 'name' | 'description' | 'backgroundColour'>>) => {
+    setError(null)
+    const res = await authFetch(`/api/boards/${boardId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    })
+    const data = await res.json()
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Unable to update board')
+    }
+
+    setBoard(data.data || null)
+    return data.data as BoardWithRole
+  }
+
+  return { board, members, isLoading, error, inviteMember, removeMember, updateBoard }
 }

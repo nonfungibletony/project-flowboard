@@ -6,6 +6,7 @@ import { Column } from '../components/Column'
 import { useBoard } from '../hooks/useBoard'
 import { useColumns } from '../hooks/useColumns'
 import { useAuthFetch } from '../hooks/useAuth'
+import { BOARD_BACKGROUNDS } from '../constants/boardBackgrounds'
 
 export function Board() {
   const { boardId } = useParams()
@@ -27,8 +28,12 @@ export function Board() {
   const [activities, setActivities] = useState<Activity[]>([])
   const [activityError, setActivityError] = useState<string | null>(null)
   const [isLoadingActivities, setIsLoadingActivities] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [settingsBackground, setSettingsBackground] = useState<string | null>(null)
+  const [settingsError, setSettingsError] = useState<string | null>(null)
+  const [isSavingSettings, setIsSavingSettings] = useState(false)
   const authFetch = useAuthFetch()
-  const { board, members, isLoading: boardLoading, error: boardError, inviteMember, removeMember } = useBoard(boardId!)
+  const { board, members, isLoading: boardLoading, error: boardError, inviteMember, removeMember, updateBoard } = useBoard(boardId!)
   const { columns, labels, isLoading: columnsLoading, error, createColumn, createCard, moveCard, reorderColumns, deleteCard, createLabel, setCardLabels, setCardDueDate, getCardAttachments, uploadCardAttachment, deleteCardAttachment, getCardChecklists, createChecklist, deleteChecklist, createChecklistItem, updateChecklistItem, reorderChecklistItems, deleteChecklistItem } = useColumns(boardId!)
 
   const canEdit = board?.role === 'owner' || board?.role === 'editor'
@@ -65,6 +70,10 @@ export function Board() {
   useEffect(() => {
     loadActivities()
   }, [authFetch, boardId])
+
+  useEffect(() => {
+    setSettingsBackground(board?.backgroundColour || null)
+  }, [board?.backgroundColour])
 
   const handleCreateColumn = async () => {
     if (!newColumnName.trim()) return
@@ -138,10 +147,25 @@ export function Board() {
     setDueTo('')
   }
 
+  const handleSaveSettings = async () => {
+    setSettingsError(null)
+    setIsSavingSettings(true)
+
+    try {
+      await updateBoard({ backgroundColour: settingsBackground })
+      setShowSettings(false)
+    } catch (err) {
+      setSettingsError(err instanceof Error ? err.message : 'Unable to update board')
+    } finally {
+      setIsSavingSettings(false)
+    }
+  }
+
   if (boardLoading || columnsLoading) return <p>Loading...</p>
 
   return (
-    <div className="container">
+    <div className="board-shell" style={{ background: board?.backgroundColour || undefined }}>
+      <div className="container">
       <div className="board-header">
         <div>
           <h1>{board?.name || 'Board'}</h1>
@@ -150,6 +174,11 @@ export function Board() {
         <button type="button" className="btn btn-secondary" onClick={() => setShowActivity(true)}>
           Activity
         </button>
+        {canEdit && (
+          <button type="button" className="btn btn-secondary" onClick={() => setShowSettings(true)}>
+            Settings
+          </button>
+        )}
         <div className="member-strip">
           {members.map((member) => (
             <div key={member.userId} className="member-pill" title={`${member.name} (${member.role})`}>
@@ -357,6 +386,44 @@ export function Board() {
           </div>
         </div>
       )}
+      {showSettings && (
+        <div className="modal-overlay" onClick={isSavingSettings ? undefined : () => setShowSettings(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Board settings</h2>
+            <div className="background-picker">
+              <button
+                type="button"
+                className={`background-swatch background-swatch-blank${settingsBackground === null ? ' background-swatch-selected' : ''}`}
+                onClick={() => setSettingsBackground(null)}
+                disabled={isSavingSettings}
+                aria-label="Use default background"
+              />
+              {BOARD_BACKGROUNDS.map((background) => (
+                <button
+                  key={background.name}
+                  type="button"
+                  className={`background-swatch${settingsBackground === background.value ? ' background-swatch-selected' : ''}`}
+                  style={{ background: background.value }}
+                  onClick={() => setSettingsBackground(background.value)}
+                  disabled={isSavingSettings}
+                  aria-label={`Use ${background.name} background`}
+                  title={background.name}
+                />
+              ))}
+            </div>
+            {settingsError && <p className="form-error">{settingsError}</p>}
+            <div className="modal-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setShowSettings(false)} disabled={isSavingSettings}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-primary" onClick={handleSaveSettings} disabled={isSavingSettings}>
+                {isSavingSettings ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      </div>
     </div>
   )
 }

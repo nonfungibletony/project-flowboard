@@ -1,0 +1,1 @@
+ALTER TABLE "boards" ADD COLUMN "background_colour" varchar(100);

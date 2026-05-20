@@ -57,6 +57,13 @@
       "when": 1779237766255,
       "tag": "0007_wealthy_sandman",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1779240051399,
+      "tag": "0008_lovely_thunderball",
+      "breakpoints": true
     }
   ]
 }

@@ -35,13 +35,13 @@ export function useBoards() {
       })
   }, [authFetch])
 
-  const createBoard = async (name: string, description?: string, templateId?: string) => {
+  const createBoard = async (name: string, description?: string, templateId?: string, backgroundColour?: string | null) => {
     setError(null)
 
     const res = await authFetch(`/api/boards`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, description, templateId: templateId || undefined }),
+      body: JSON.stringify({ name, description, templateId: templateId || undefined, backgroundColour: backgroundColour || undefined }),
     })
     const data = await res.json()
 

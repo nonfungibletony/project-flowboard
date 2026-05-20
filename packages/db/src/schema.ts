@@ -14,6 +14,7 @@ export const boards = pgTable("boards", {
   description: varchar("description", { length: 500 }),
   createdBy: uuid("created_by").notNull().references(() => users.id),
   starred: boolean("starred").default(false).notNull(),
+  backgroundColour: varchar("background_colour", { length: 100 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

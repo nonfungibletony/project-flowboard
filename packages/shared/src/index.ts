@@ -23,6 +23,7 @@ export const BoardSchema = z.object({
   description: z.string().max(500).optional(),
   createdBy: z.string().uuid(),
   starred: z.boolean(),
+  backgroundColour: z.string().max(100).nullable().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -30,7 +31,7 @@ export const BoardSchema = z.object({
 export const CreateBoardSchema = BoardSchema.omit({ id: true, createdBy: true, starred: true, createdAt: true, updatedAt: true }).extend({
   templateId: z.string().uuid().optional(),
 });
-export const UpdateBoardSchema = BoardSchema.pick({ name: true, description: true, starred: true }).partial();
+export const UpdateBoardSchema = BoardSchema.pick({ name: true, description: true, starred: true, backgroundColour: true }).partial();
 
 export type Board = z.infer<typeof BoardSchema>;
 export type CreateBoard = z.infer<typeof CreateBoardSchema>;
