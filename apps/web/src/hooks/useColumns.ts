@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import type { Attachment, Card, Column, Label } from '@group/shared'
+import type { Attachment, Card, Checklist, ChecklistItem, Column, Label } from '@group/shared'
 import { useAuthFetch } from './useAuth'
 
 export function useColumns(boardId: string) {
@@ -70,6 +70,7 @@ export function useColumns(boardId: string) {
       comments: [],
       labels: [],
       attachments: [],
+      checklists: [],
     }
 
     setColumns((prev) =>
@@ -98,7 +99,7 @@ export function useColumns(boardId: string) {
       throw new Error(data.message || 'Unable to create card')
     }
 
-    const card = normalizeCard({ ...data.data, comments: [], labels: [], attachments: [] } as Card)
+    const card = normalizeCard({ ...data.data, comments: [], labels: [], attachments: [], checklists: [] } as Card)
     setColumns((prev) =>
       prev.map((col) =>
         col.id === columnId
@@ -143,7 +144,7 @@ export function useColumns(boardId: string) {
       throw new Error(data.message || 'Unable to move card')
     }
 
-    const savedCard = normalizeCard({ ...data.data, comments: movedCard.comments || [], labels: movedCard.labels || [], attachments: movedCard.attachments || [] } as Card)
+    const savedCard = normalizeCard({ ...data.data, comments: movedCard.comments || [], labels: movedCard.labels || [], attachments: movedCard.attachments || [], checklists: movedCard.checklists || [] } as Card)
     setColumns((prev) =>
       prev.map((column) =>
         column.id === targetColumnId
@@ -303,7 +304,7 @@ export function useColumns(boardId: string) {
         column.id === columnId
           ? {
               ...column,
-              cards: (column.cards || []).map((card) => card.id === cardId ? { ...savedCard, labels: card.labels || [], comments: card.comments || [], attachments: card.attachments || [] } : card),
+              cards: (column.cards || []).map((card) => card.id === cardId ? { ...savedCard, labels: card.labels || [], comments: card.comments || [], attachments: card.attachments || [], checklists: card.checklists || [] } : card),
             }
           : column
       )
@@ -364,7 +365,141 @@ export function useColumns(boardId: string) {
     })))
   }
 
-  return { columns, labels, isLoading, error, createColumn, createCard, moveCard, reorderColumns, deleteCard, createLabel, setCardLabels, setCardDueDate, getCardAttachments, uploadCardAttachment, deleteCardAttachment }
+  const getCardChecklists = async (cardId: string, columnId: string) => {
+    setError(null)
+
+    const res = await authFetch(`/api/boards/cards/${cardId}/checklists`)
+    const data = await res.json()
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Unable to load checklists')
+    }
+
+    const checklists = data.data as Checklist[]
+    setColumns(updateCard(columnId, cardId, (card) => ({ ...card, checklists })))
+    return checklists
+  }
+
+  const createChecklist = async (cardId: string, columnId: string, title: string) => {
+    setError(null)
+
+    const res = await authFetch(`/api/boards/cards/${cardId}/checklists`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title }),
+    })
+    const data = await res.json()
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Unable to create checklist')
+    }
+
+    const checklist = data.data as Checklist
+    setColumns(updateCard(columnId, cardId, (card) => ({ ...card, checklists: [...(card.checklists || []), checklist] })))
+    return checklist
+  }
+
+  const deleteChecklist = async (cardId: string, columnId: string, checklistId: string) => {
+    setError(null)
+
+    const res = await authFetch(`/api/boards/checklists/${checklistId}`, { method: 'DELETE' })
+    const data = await res.json()
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Unable to delete checklist')
+    }
+
+    setColumns(updateCard(columnId, cardId, (card) => ({
+      ...card,
+      checklists: (card.checklists || []).filter((checklist) => checklist.id !== checklistId),
+    })))
+  }
+
+  const createChecklistItem = async (cardId: string, columnId: string, checklistId: string, content: string) => {
+    setError(null)
+
+    const res = await authFetch(`/api/boards/checklists/${checklistId}/items`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    })
+    const data = await res.json()
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Unable to create checklist item')
+    }
+
+    const item = data.data as ChecklistItem
+    setColumns(updateChecklist(cardId, columnId, checklistId, (checklist) => ({ ...checklist, items: [...(checklist.items || []), item] })))
+    return item
+  }
+
+  const updateChecklistItem = async (cardId: string, columnId: string, checklistId: string, itemId: string, updates: Partial<Pick<ChecklistItem, 'content' | 'completed' | 'order'>>) => {
+    setError(null)
+
+    const res = await authFetch(`/api/boards/checklist-items/${itemId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    })
+    const data = await res.json()
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Unable to update checklist item')
+    }
+
+    const item = data.data as ChecklistItem
+    setColumns(updateChecklist(cardId, columnId, checklistId, (checklist) => ({
+      ...checklist,
+      items: sortChecklistItems((checklist.items || []).map((current) => current.id === itemId ? item : current)),
+    })))
+    return item
+  }
+
+  const reorderChecklistItems = async (cardId: string, columnId: string, checklistId: string, sourceIndex: number, targetIndex: number) => {
+    setError(null)
+
+    const card = columns.find((column) => column.id === columnId)?.cards?.find((current) => current.id === cardId)
+    const checklist = (card?.checklists as Checklist[] | undefined)?.find((current) => current.id === checklistId)
+    if (!checklist) return []
+
+    const items = moveChecklistItem(checklist.items || [], sourceIndex, targetIndex)
+    setColumns(updateChecklist(cardId, columnId, checklistId, (current) => ({ ...current, items })))
+
+    const res = await authFetch(`/api/boards/checklists/${checklistId}/items/reorder`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updates: items.map((item) => ({ id: item.id, order: item.order })) }),
+    })
+    const data = await res.json()
+
+    if (!res.ok || !data.success) {
+      setColumns(updateChecklist(cardId, columnId, checklistId, (current) => ({ ...current, items: checklist.items || [] })))
+      throw new Error(data.message || 'Unable to reorder checklist items')
+    }
+
+    const savedItems = data.data as ChecklistItem[]
+    setColumns(updateChecklist(cardId, columnId, checklistId, (current) => ({ ...current, items: sortChecklistItems(savedItems) })))
+    return savedItems
+  }
+
+  const deleteChecklistItem = async (cardId: string, columnId: string, checklistId: string, itemId: string) => {
+    setError(null)
+
+    const res = await authFetch(`/api/boards/checklist-items/${itemId}`, { method: 'DELETE' })
+    const data = await res.json()
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Unable to delete checklist item')
+    }
+
+    setColumns(updateChecklist(cardId, columnId, checklistId, (checklist) => ({
+      ...checklist,
+      items: (checklist.items || []).filter((item) => item.id !== itemId),
+    })))
+  }
+
+  return { columns, labels, isLoading, error, createColumn, createCard, moveCard, reorderColumns, deleteCard, createLabel, setCardLabels, setCardDueDate, getCardAttachments, uploadCardAttachment, deleteCardAttachment, getCardChecklists, createChecklist, deleteChecklist, createChecklistItem, updateChecklistItem, reorderChecklistItems, deleteChecklistItem }
 }
 
 function sortColumns(columns: Column[]) {
@@ -383,7 +518,7 @@ function normalizeColumn(column: Column) {
 }
 
 function normalizeCard(card: Card) {
-  return { ...card, comments: card.comments || [], labels: card.labels || [], attachments: card.attachments || [] }
+  return { ...card, comments: card.comments || [], labels: card.labels || [], attachments: card.attachments || [], checklists: card.checklists || [] }
 }
 
 function updateCard(columnId: string, cardId: string, updater: (card: Card) => Card) {
@@ -393,6 +528,28 @@ function updateCard(columnId: string, cardId: string, updater: (card: Card) => C
         ? { ...column, cards: (column.cards || []).map((card) => card.id === cardId ? updater(card) : card) }
         : column
     )
+}
+
+function updateChecklist(cardId: string, columnId: string, checklistId: string, updater: (checklist: Checklist) => Checklist) {
+  return updateCard(columnId, cardId, (card) => ({
+    ...card,
+    checklists: (card.checklists || []).map((checklist) => checklist.id === checklistId ? updater(checklist as Checklist) : checklist),
+  }))
+}
+
+function sortChecklistItems(items: ChecklistItem[]) {
+  return [...items].sort((a, b) => a.order - b.order)
+}
+
+function moveChecklistItem(items: ChecklistItem[], sourceIndex: number, targetIndex: number) {
+  if (sourceIndex === targetIndex) return items
+
+  const nextItems = [...items]
+  const [movedItem] = nextItems.splice(sourceIndex, 1)
+  if (!movedItem) return items
+
+  nextItems.splice(targetIndex, 0, movedItem)
+  return nextItems.map((item, index) => ({ ...item, order: index }))
 }
 
 function sortCards(cards: Card[]) {

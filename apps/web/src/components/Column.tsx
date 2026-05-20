@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Draggable, Droppable, type DraggableProvidedDragHandleProps } from '@hello-pangea/dnd'
-import type { Attachment, Column as ColumnType, Card, Label } from '@group/shared'
+import type { Attachment, Checklist, ChecklistItem, Column as ColumnType, Card, Label } from '@group/shared'
 import { DeleteCardModal } from './DeleteCardModal'
 
 interface Props {
@@ -18,11 +18,18 @@ interface Props {
   onGetCardAttachments: (cardId: string) => Promise<Attachment[]>
   onUploadCardAttachment: (cardId: string, file: File) => Promise<Attachment>
   onDeleteCardAttachment: (cardId: string, attachmentId: string) => Promise<unknown>
+  onGetCardChecklists: (cardId: string) => Promise<Checklist[]>
+  onCreateChecklist: (cardId: string, title: string) => Promise<Checklist>
+  onDeleteChecklist: (cardId: string, checklistId: string) => Promise<unknown>
+  onCreateChecklistItem: (cardId: string, checklistId: string, content: string) => Promise<ChecklistItem>
+  onUpdateChecklistItem: (cardId: string, checklistId: string, itemId: string, updates: Partial<Pick<ChecklistItem, 'content' | 'completed' | 'order'>>) => Promise<ChecklistItem>
+  onReorderChecklistItems: (cardId: string, checklistId: string, sourceIndex: number, targetIndex: number) => Promise<ChecklistItem[]>
+  onDeleteChecklistItem: (cardId: string, checklistId: string, itemId: string) => Promise<unknown>
 }
 
 const LABEL_COLOURS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899']
 
-export function Column({ column, labels, canEdit, canDrag, searchTerm, columnDragHandleProps, onAddCard, onDeleteCard, onCreateLabel, onSetCardLabels, onSetCardDueDate, onGetCardAttachments, onUploadCardAttachment, onDeleteCardAttachment }: Props) {
+export function Column({ column, labels, canEdit, canDrag, searchTerm, columnDragHandleProps, onAddCard, onDeleteCard, onCreateLabel, onSetCardLabels, onSetCardDueDate, onGetCardAttachments, onUploadCardAttachment, onDeleteCardAttachment, onGetCardChecklists, onCreateChecklist, onDeleteChecklist, onCreateChecklistItem, onUpdateChecklistItem, onReorderChecklistItems, onDeleteChecklistItem }: Props) {
   const [showAdd, setShowAdd] = useState(false)
   const [newCardTitle, setNewCardTitle] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -45,6 +52,13 @@ export function Column({ column, labels, canEdit, canDrag, searchTerm, columnDra
   const [isLoadingAttachments, setIsLoadingAttachments] = useState(false)
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
   const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null)
+  const [checklistCard, setChecklistCard] = useState<Card | null>(null)
+  const [checklists, setChecklists] = useState<Checklist[]>([])
+  const [newChecklistTitle, setNewChecklistTitle] = useState('')
+  const [newItemContent, setNewItemContent] = useState<Record<string, string>>({})
+  const [checklistError, setChecklistError] = useState<string | null>(null)
+  const [isLoadingChecklists, setIsLoadingChecklists] = useState(false)
+  const [isSavingChecklist, setIsSavingChecklist] = useState(false)
 
   const handleAdd = async () => {
     if (!newCardTitle.trim()) return
@@ -197,6 +211,136 @@ export function Column({ column, labels, canEdit, canDrag, searchTerm, columnDra
     }
   }
 
+  const openChecklists = async (card: Card) => {
+    setChecklistCard(card)
+    setChecklists(card.checklists || [])
+    setChecklistError(null)
+    setIsLoadingChecklists(true)
+
+    try {
+      const loaded = await onGetCardChecklists(card.id)
+      setChecklists(loaded)
+      setChecklistCard({ ...card, checklists: loaded })
+    } catch (err) {
+      setChecklistError(err instanceof Error ? err.message : 'Unable to load checklists')
+    } finally {
+      setIsLoadingChecklists(false)
+    }
+  }
+
+  const handleCreateChecklist = async () => {
+    if (!checklistCard || !newChecklistTitle.trim()) return
+
+    setChecklistError(null)
+    setIsSavingChecklist(true)
+
+    try {
+      const checklist = await onCreateChecklist(checklistCard.id, newChecklistTitle.trim())
+      const nextChecklists = [...checklists, checklist]
+      setChecklists(nextChecklists)
+      setChecklistCard({ ...checklistCard, checklists: nextChecklists })
+      setNewChecklistTitle('')
+    } catch (err) {
+      setChecklistError(err instanceof Error ? err.message : 'Unable to create checklist')
+    } finally {
+      setIsSavingChecklist(false)
+    }
+  }
+
+  const handleDeleteChecklist = async (checklistId: string) => {
+    if (!checklistCard) return
+
+    setChecklistError(null)
+    setIsSavingChecklist(true)
+
+    try {
+      await onDeleteChecklist(checklistCard.id, checklistId)
+      const nextChecklists = checklists.filter((checklist) => checklist.id !== checklistId)
+      setChecklists(nextChecklists)
+      setChecklistCard({ ...checklistCard, checklists: nextChecklists })
+    } catch (err) {
+      setChecklistError(err instanceof Error ? err.message : 'Unable to delete checklist')
+    } finally {
+      setIsSavingChecklist(false)
+    }
+  }
+
+  const handleCreateChecklistItem = async (checklistId: string) => {
+    if (!checklistCard || !newItemContent[checklistId]?.trim()) return
+
+    setChecklistError(null)
+    setIsSavingChecklist(true)
+
+    try {
+      const item = await onCreateChecklistItem(checklistCard.id, checklistId, newItemContent[checklistId].trim())
+      const nextChecklists = updateChecklistList(checklists, checklistId, (checklist) => ({ ...checklist, items: [...(checklist.items || []), item] }))
+      setChecklists(nextChecklists)
+      setChecklistCard({ ...checklistCard, checklists: nextChecklists })
+      setNewItemContent({ ...newItemContent, [checklistId]: '' })
+    } catch (err) {
+      setChecklistError(err instanceof Error ? err.message : 'Unable to add checklist item')
+    } finally {
+      setIsSavingChecklist(false)
+    }
+  }
+
+  const handleToggleChecklistItem = async (checklistId: string, item: ChecklistItem) => {
+    if (!checklistCard) return
+
+    setChecklistError(null)
+
+    try {
+      const savedItem = await onUpdateChecklistItem(checklistCard.id, checklistId, item.id, { completed: !item.completed })
+      const nextChecklists = updateChecklistList(checklists, checklistId, (checklist) => ({
+        ...checklist,
+        items: (checklist.items || []).map((current) => current.id === item.id ? savedItem : current),
+      }))
+      setChecklists(nextChecklists)
+      setChecklistCard({ ...checklistCard, checklists: nextChecklists })
+    } catch (err) {
+      setChecklistError(err instanceof Error ? err.message : 'Unable to update checklist item')
+    }
+  }
+
+  const handleMoveChecklistItem = async (checklistId: string, sourceIndex: number, targetIndex: number) => {
+    if (!checklistCard) return
+
+    setChecklistError(null)
+    setIsSavingChecklist(true)
+
+    try {
+      const items = await onReorderChecklistItems(checklistCard.id, checklistId, sourceIndex, targetIndex)
+      const nextChecklists = updateChecklistList(checklists, checklistId, (checklist) => ({ ...checklist, items }))
+      setChecklists(nextChecklists)
+      setChecklistCard({ ...checklistCard, checklists: nextChecklists })
+    } catch (err) {
+      setChecklistError(err instanceof Error ? err.message : 'Unable to reorder checklist items')
+    } finally {
+      setIsSavingChecklist(false)
+    }
+  }
+
+  const handleDeleteChecklistItem = async (checklistId: string, itemId: string) => {
+    if (!checklistCard) return
+
+    setChecklistError(null)
+    setIsSavingChecklist(true)
+
+    try {
+      await onDeleteChecklistItem(checklistCard.id, checklistId, itemId)
+      const nextChecklists = updateChecklistList(checklists, checklistId, (checklist) => ({
+        ...checklist,
+        items: (checklist.items || []).filter((item) => item.id !== itemId),
+      }))
+      setChecklists(nextChecklists)
+      setChecklistCard({ ...checklistCard, checklists: nextChecklists })
+    } catch (err) {
+      setChecklistError(err instanceof Error ? err.message : 'Unable to delete checklist item')
+    } finally {
+      setIsSavingChecklist(false)
+    }
+  }
+
   return (
     <div className="column">
       <div className={`column-header${columnDragHandleProps ? ' column-header-draggable' : ''}`} {...columnDragHandleProps}>
@@ -247,6 +391,17 @@ export function Column({ column, labels, canEdit, canDrag, searchTerm, columnDra
                             </>
                           )}
                         </div>
+                        {getChecklistProgress(card).total > 0 && (
+                          <div className="checklist-progress">
+                            <div className="checklist-progress-meta">
+                              <span>{getChecklistProgress(card).completed}/{getChecklistProgress(card).total}</span>
+                              <span>{Math.round((getChecklistProgress(card).completed / getChecklistProgress(card).total) * 100)}%</span>
+                            </div>
+                            <div className="checklist-progress-track">
+                              <span style={{ width: `${(getChecklistProgress(card).completed / getChecklistProgress(card).total) * 100}%` }} />
+                            </div>
+                          </div>
+                        )}
                         {card.dueDate && (
                           <span className={`due-date-badge ${getDueDateStatus(card.dueDate)}`}>
                             {formatDueDate(card.dueDate)}
@@ -264,6 +419,16 @@ export function Column({ column, labels, canEdit, canDrag, searchTerm, columnDra
                             }}
                           >
                             Files
+                          </button>
+                          <button
+                            type="button"
+                            className="card-action-btn"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openChecklists(card)
+                            }}
+                          >
+                            Tasks
                           </button>
                           {canEdit && (
                             <>
@@ -514,6 +679,107 @@ export function Column({ column, labels, canEdit, canDrag, searchTerm, columnDra
           </div>
         </div>
       )}
+      {checklistCard && (
+        <div className="modal-overlay" onClick={isSavingChecklist ? undefined : () => setChecklistCard(null)}>
+          <div className="modal checklist-modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Checklists</h2>
+            <p className="modal-copy">{checklistCard.title}</p>
+            {canEdit && (
+              <div className="checklist-create">
+                <input
+                  type="text"
+                  placeholder="Checklist title"
+                  value={newChecklistTitle}
+                  onChange={(e) => setNewChecklistTitle(e.target.value)}
+                  maxLength={200}
+                  disabled={isSavingChecklist}
+                />
+                <button type="button" className="btn btn-primary" onClick={handleCreateChecklist} disabled={isSavingChecklist || !newChecklistTitle.trim()}>
+                  Add checklist
+                </button>
+              </div>
+            )}
+            {checklistError && <p className="form-error">{checklistError}</p>}
+            {isLoadingChecklists ? (
+              <p className="modal-copy">Loading checklists...</p>
+            ) : checklists.length ? (
+              <div className="checklist-list">
+                {checklists.map((checklist) => {
+                  const progress = getChecklistProgress({ ...checklistCard, checklists: [checklist] })
+                  return (
+                    <section key={checklist.id} className="checklist-section">
+                      <div className="checklist-section-header">
+                        <div>
+                          <h3>{checklist.title}</h3>
+                          <span>{progress.completed}/{progress.total} complete</span>
+                        </div>
+                        {canEdit && (
+                          <button type="button" className="card-action-btn card-delete-btn" onClick={() => handleDeleteChecklist(checklist.id)} disabled={isSavingChecklist}>
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                      <div className="checklist-items">
+                        {(checklist.items || []).map((item, index) => (
+                          <div key={item.id} className="checklist-item-row">
+                            <label>
+                              <input
+                                type="checkbox"
+                                checked={item.completed}
+                                onChange={() => handleToggleChecklistItem(checklist.id, item)}
+                                disabled={!canEdit}
+                              />
+                              <span className={item.completed ? 'checklist-item-completed' : ''}>{item.content}</span>
+                            </label>
+                            {canEdit && (
+                              <div className="checklist-item-actions">
+                                <button type="button" className="card-action-btn" onClick={() => handleMoveChecklistItem(checklist.id, index, index - 1)} disabled={isSavingChecklist || index === 0}>
+                                  Up
+                                </button>
+                                <button type="button" className="card-action-btn" onClick={() => handleMoveChecklistItem(checklist.id, index, index + 1)} disabled={isSavingChecklist || index === (checklist.items || []).length - 1}>
+                                  Down
+                                </button>
+                                <button type="button" className="card-action-btn card-delete-btn" onClick={() => handleDeleteChecklistItem(checklist.id, item.id)} disabled={isSavingChecklist}>
+                                  Delete
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      {canEdit && (
+                        <div className="checklist-item-create">
+                          <input
+                            type="text"
+                            placeholder="Add an item"
+                            value={newItemContent[checklist.id] || ''}
+                            onChange={(e) => setNewItemContent({ ...newItemContent, [checklist.id]: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleCreateChecklistItem(checklist.id)
+                            }}
+                            maxLength={500}
+                            disabled={isSavingChecklist}
+                          />
+                          <button type="button" className="btn btn-secondary btn-small" onClick={() => handleCreateChecklistItem(checklist.id)} disabled={isSavingChecklist || !newItemContent[checklist.id]?.trim()}>
+                            Add
+                          </button>
+                        </div>
+                      )}
+                    </section>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="modal-copy">No checklists yet.</p>
+            )}
+            <div className="modal-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setChecklistCard(null)} disabled={isSavingChecklist}>
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -582,4 +848,16 @@ function getDescriptionMatch(card: Card, searchTerm: string) {
   const suffix = end < card.description.length ? '...' : ''
 
   return `${prefix}${card.description.slice(start, end)}${suffix}`
+}
+
+function getChecklistProgress(card: Card | { checklists?: Checklist[] }) {
+  const items = (card.checklists || []).flatMap((checklist) => checklist.items || [])
+  return {
+    completed: items.filter((item) => item.completed).length,
+    total: items.length,
+  }
+}
+
+function updateChecklistList(checklists: Checklist[], checklistId: string, updater: (checklist: Checklist) => Checklist) {
+  return checklists.map((checklist) => checklist.id === checklistId ? updater(checklist) : checklist)
 }

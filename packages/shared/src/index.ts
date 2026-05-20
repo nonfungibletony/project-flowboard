@@ -117,9 +117,10 @@ export const CardSchema = z.object({
   comments: z.array(z.any()).optional(),
   labels: z.array(LabelSchema).optional(),
   attachments: z.array(z.any()).optional(),
+  checklists: z.array(z.any()).optional(),
 });
 
-export const CreateCardSchema = CardSchema.omit({ id: true, order: true, createdAt: true, updatedAt: true, comments: true, labels: true, attachments: true });
+export const CreateCardSchema = CardSchema.omit({ id: true, order: true, createdAt: true, updatedAt: true, comments: true, labels: true, attachments: true, checklists: true });
 export const UpdateCardSchema = z.object({
   title: z.string().min(1).max(500).optional(),
   description: z.string().max(5000).optional(),
@@ -159,6 +160,34 @@ export const AttachmentSchema = z.object({
 });
 
 export type Attachment = z.infer<typeof AttachmentSchema>;
+
+// Checklist
+export const ChecklistItemSchema = z.object({
+  id: z.string().uuid(),
+  checklistId: z.string().uuid(),
+  content: z.string().min(1).max(500),
+  completed: z.boolean(),
+  order: z.number().int().min(0),
+});
+
+export const ChecklistSchema = z.object({
+  id: z.string().uuid(),
+  cardId: z.string().uuid(),
+  title: z.string().min(1).max(200),
+  order: z.number().int().min(0),
+  items: z.array(ChecklistItemSchema).optional(),
+});
+
+export const CreateChecklistSchema = ChecklistSchema.omit({ id: true, order: true, items: true });
+export const CreateChecklistItemSchema = ChecklistItemSchema.omit({ id: true, completed: true, order: true });
+export const UpdateChecklistItemSchema = z.object({
+  content: z.string().min(1).max(500).optional(),
+  completed: z.boolean().optional(),
+  order: z.number().int().min(0).optional(),
+});
+
+export type Checklist = z.infer<typeof ChecklistSchema>;
+export type ChecklistItem = z.infer<typeof ChecklistItemSchema>;
 
 // API Response helper
 export const ApiResponseSchema = <T extends z.ZodTypeAny>(dataSchema: T) =>

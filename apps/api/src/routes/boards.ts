@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import multer from "multer";
-import { CreateBoardSchema, UpdateBoardSchema, CreateColumnSchema, CreateCardSchema, UpdateCardSchema, CreateCommentSchema, CreateLabelSchema, InviteBoardMemberSchema } from "@group/shared";
+import { CreateBoardSchema, UpdateBoardSchema, CreateColumnSchema, CreateCardSchema, UpdateCardSchema, CreateCommentSchema, CreateLabelSchema, InviteBoardMemberSchema, CreateChecklistSchema, CreateChecklistItemSchema, UpdateChecklistItemSchema } from "@group/shared";
 import { db, schema } from "@group/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth.js";
@@ -152,6 +152,30 @@ async function getWritableAttachment(attachmentId: string, userId: string) {
   return card ? attachment[0] : null;
 }
 
+async function getWritableChecklist(checklistId: string, userId: string) {
+  const checklist = await db
+    .select()
+    .from(schema.checklists)
+    .where(eq(schema.checklists.id, checklistId))
+    .limit(1);
+
+  if (!checklist.length) return null;
+  const card = await getWritableCard(checklist[0].cardId, userId);
+  return card ? checklist[0] : null;
+}
+
+async function getWritableChecklistItem(itemId: string, userId: string) {
+  const item = await db
+    .select()
+    .from(schema.checklistItems)
+    .where(eq(schema.checklistItems.id, itemId))
+    .limit(1);
+
+  if (!item.length) return null;
+  const checklist = await getWritableChecklist(item[0].checklistId, userId);
+  return checklist ? { item: item[0], checklist } : null;
+}
+
 async function getLabelsByCardIds(cardIds: string[]) {
   const labelsByCard = new Map<string, Array<typeof schema.labels.$inferSelect>>();
   if (!cardIds.length) return labelsByCard;
@@ -170,6 +194,36 @@ async function getLabelsByCardIds(cardIds: string[]) {
   }
 
   return labelsByCard;
+}
+
+async function getChecklistsByCardIds(cardIds: string[]) {
+  const checklistsByCard = new Map<string, Array<typeof schema.checklists.$inferSelect & { items: Array<typeof schema.checklistItems.$inferSelect> }>>();
+  if (!cardIds.length) return checklistsByCard;
+
+  const checklists = await db.select().from(schema.checklists).where(inArray(schema.checklists.cardId, cardIds));
+  const checklistIds = checklists.map((checklist) => checklist.id);
+  const items = checklistIds.length
+    ? await db.select().from(schema.checklistItems).where(inArray(schema.checklistItems.checklistId, checklistIds))
+    : [];
+
+  const itemsByChecklist = new Map<string, Array<typeof schema.checklistItems.$inferSelect>>();
+  for (const item of items) {
+    itemsByChecklist.set(item.checklistId, [...(itemsByChecklist.get(item.checklistId) || []), item]);
+  }
+
+  for (const checklist of checklists) {
+    const withItems = {
+      ...checklist,
+      items: (itemsByChecklist.get(checklist.id) || []).sort((a, b) => a.order - b.order),
+    };
+    checklistsByCard.set(checklist.cardId, [...(checklistsByCard.get(checklist.cardId) || []), withItems]);
+  }
+
+  for (const [cardId, cardChecklists] of checklistsByCard) {
+    checklistsByCard.set(cardId, cardChecklists.sort((a, b) => a.order - b.order));
+  }
+
+  return checklistsByCard;
 }
 
 // Boards
@@ -404,9 +458,14 @@ router.get("/:id/columns", requireAuth, async (req: Request, res: Response) => {
     cols.map(async (col) => {
       const cards = await db.select().from(schema.cards).where(eq(schema.cards.columnId, col.id));
       const labelsByCard = await getLabelsByCardIds(cards.map((card) => card.id));
+      const checklistsByCard = await getChecklistsByCardIds(cards.map((card) => card.id));
       return {
         ...col,
-        cards: cards.map((card) => ({ ...card, labels: labelsByCard.get(card.id) || [] })),
+        cards: cards.map((card) => ({
+          ...card,
+          labels: labelsByCard.get(card.id) || [],
+          checklists: checklistsByCard.get(card.id) || [],
+        })),
       };
     })
   );
@@ -631,6 +690,123 @@ router.delete("/attachments/:id", requireAuth, async (req: Request, res: Respons
     await fs.unlink(filePath).catch(() => undefined);
   }
 
+  res.json({ success: true });
+});
+
+// Checklists
+router.get("/cards/:cardId/checklists", requireAuth, async (req: Request, res: Response) => {
+  const card = await getReadableCard(req.params.cardId, req.user!.id);
+  if (!card) return res.status(404).json({ success: false, message: "Card not found" });
+
+  const checklists = await getChecklistsByCardIds([req.params.cardId]);
+  res.json({ success: true, data: checklists.get(req.params.cardId) || [] });
+});
+
+router.post("/cards/:cardId/checklists", requireAuth, async (req: Request, res: Response) => {
+  const card = await getWritableCard(req.params.cardId, req.user!.id);
+  if (!card) return res.status(404).json({ success: false, message: "Card not found" });
+
+  const existing = await db.select().from(schema.checklists).where(eq(schema.checklists.cardId, req.params.cardId));
+  const parsed = CreateChecklistSchema.safeParse({
+    ...req.body,
+    cardId: req.params.cardId,
+  });
+  if (!parsed.success) {
+    return res.status(400).json({ success: false, message: parsed.error.message });
+  }
+
+  const inserted = await db
+    .insert(schema.checklists)
+    .values({ ...parsed.data, order: existing.length })
+    .returning();
+  res.status(201).json({ success: true, data: { ...inserted[0], items: [] } });
+});
+
+router.delete("/checklists/:id", requireAuth, async (req: Request, res: Response) => {
+  const checklist = await getWritableChecklist(req.params.id, req.user!.id);
+  if (!checklist) return res.status(404).json({ success: false, message: "Checklist not found" });
+
+  await db.delete(schema.checklists).where(eq(schema.checklists.id, req.params.id));
+  res.json({ success: true });
+});
+
+router.post("/checklists/:id/items", requireAuth, async (req: Request, res: Response) => {
+  const checklist = await getWritableChecklist(req.params.id, req.user!.id);
+  if (!checklist) return res.status(404).json({ success: false, message: "Checklist not found" });
+
+  const existing = await db.select().from(schema.checklistItems).where(eq(schema.checklistItems.checklistId, req.params.id));
+  const parsed = CreateChecklistItemSchema.safeParse({
+    ...req.body,
+    checklistId: req.params.id,
+  });
+  if (!parsed.success) {
+    return res.status(400).json({ success: false, message: parsed.error.message });
+  }
+
+  const inserted = await db
+    .insert(schema.checklistItems)
+    .values({ ...parsed.data, order: existing.length })
+    .returning();
+  res.status(201).json({ success: true, data: inserted[0] });
+});
+
+router.patch("/checklist-items/:id", requireAuth, async (req: Request, res: Response) => {
+  const access = await getWritableChecklistItem(req.params.id, req.user!.id);
+  if (!access) return res.status(404).json({ success: false, message: "Checklist item not found" });
+
+  const parsed = UpdateChecklistItemSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ success: false, message: parsed.error.message });
+  }
+
+  const updated = await db
+    .update(schema.checklistItems)
+    .set(parsed.data)
+    .where(eq(schema.checklistItems.id, req.params.id))
+    .returning();
+  res.json({ success: true, data: updated[0] });
+});
+
+router.patch("/checklists/:id/items/reorder", requireAuth, async (req: Request, res: Response) => {
+  const checklist = await getWritableChecklist(req.params.id, req.user!.id);
+  if (!checklist) return res.status(404).json({ success: false, message: "Checklist not found" });
+
+  const updates = req.body.updates;
+  if (!Array.isArray(updates)) {
+    return res.status(400).json({ success: false, message: "updates must be an array" });
+  }
+
+  for (const update of updates) {
+    if (!update?.id || !Number.isInteger(update.order) || update.order < 0) {
+      return res.status(400).json({ success: false, message: "updates must include id and non-negative order" });
+    }
+  }
+
+  const itemIds = updates.map((update) => update.id);
+  const items = itemIds.length
+    ? await db
+        .select()
+        .from(schema.checklistItems)
+        .where(and(inArray(schema.checklistItems.id, itemIds), eq(schema.checklistItems.checklistId, req.params.id)))
+    : [];
+
+  if (items.length !== itemIds.length) {
+    return res.status(400).json({ success: false, message: "All items must belong to this checklist" });
+  }
+
+  for (const update of updates) {
+    await db.update(schema.checklistItems).set({ order: update.order }).where(eq(schema.checklistItems.id, update.id));
+  }
+
+  const reordered = await db.select().from(schema.checklistItems).where(eq(schema.checklistItems.checklistId, req.params.id));
+  res.json({ success: true, data: reordered.sort((a, b) => a.order - b.order) });
+});
+
+router.delete("/checklist-items/:id", requireAuth, async (req: Request, res: Response) => {
+  const access = await getWritableChecklistItem(req.params.id, req.user!.id);
+  if (!access) return res.status(404).json({ success: false, message: "Checklist item not found" });
+
+  await db.delete(schema.checklistItems).where(eq(schema.checklistItems.id, req.params.id));
   res.json({ success: true });
 });
 

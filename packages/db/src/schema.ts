@@ -87,3 +87,18 @@ export const attachments = pgTable("attachments", {
   uploadedBy: uuid("uploaded_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+export const checklists = pgTable("checklists", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  cardId: uuid("card_id").notNull().references(() => cards.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 200 }).notNull(),
+  order: integer("order").notNull().default(0),
+});
+
+export const checklistItems = pgTable("checklist_items", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  checklistId: uuid("checklist_id").notNull().references(() => checklists.id, { onDelete: "cascade" }),
+  content: varchar("content", { length: 500 }).notNull(),
+  completed: boolean("completed").default(false).notNull(),
+  order: integer("order").notNull().default(0),
+});

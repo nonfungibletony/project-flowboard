@@ -23,7 +23,7 @@ export function Board() {
   const [dueFrom, setDueFrom] = useState('')
   const [dueTo, setDueTo] = useState('')
   const { board, members, isLoading: boardLoading, error: boardError, inviteMember, removeMember } = useBoard(boardId!)
-  const { columns, labels, isLoading: columnsLoading, error, createColumn, createCard, moveCard, reorderColumns, deleteCard, createLabel, setCardLabels, setCardDueDate, getCardAttachments, uploadCardAttachment, deleteCardAttachment } = useColumns(boardId!)
+  const { columns, labels, isLoading: columnsLoading, error, createColumn, createCard, moveCard, reorderColumns, deleteCard, createLabel, setCardLabels, setCardDueDate, getCardAttachments, uploadCardAttachment, deleteCardAttachment, getCardChecklists, createChecklist, deleteChecklist, createChecklistItem, updateChecklistItem, reorderChecklistItems, deleteChecklistItem } = useColumns(boardId!)
 
   const canEdit = board?.role === 'owner' || board?.role === 'editor'
   const isOwner = board?.role === 'owner'
@@ -221,6 +221,13 @@ export function Board() {
                         onGetCardAttachments={(cardId) => getCardAttachments(cardId, column.id)}
                         onUploadCardAttachment={(cardId, file) => uploadCardAttachment(cardId, column.id, file)}
                         onDeleteCardAttachment={(cardId, attachmentId) => deleteCardAttachment(cardId, column.id, attachmentId)}
+                        onGetCardChecklists={(cardId) => getCardChecklists(cardId, column.id)}
+                        onCreateChecklist={(cardId, title) => createChecklist(cardId, column.id, title)}
+                        onDeleteChecklist={(cardId, checklistId) => deleteChecklist(cardId, column.id, checklistId)}
+                        onCreateChecklistItem={(cardId, checklistId, content) => createChecklistItem(cardId, column.id, checklistId, content)}
+                        onUpdateChecklistItem={(cardId, checklistId, itemId, updates) => updateChecklistItem(cardId, column.id, checklistId, itemId, updates)}
+                        onReorderChecklistItems={(cardId, checklistId, sourceIndex, targetIndex) => reorderChecklistItems(cardId, column.id, checklistId, sourceIndex, targetIndex)}
+                        onDeleteChecklistItem={(cardId, checklistId, itemId) => deleteChecklistItem(cardId, column.id, checklistId, itemId)}
                       />
                     </div>
                   )}
