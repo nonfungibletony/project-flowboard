@@ -311,6 +311,47 @@ export function useColumns(boardId: string) {
     )
   }
 
+  const updateCardDetails = async (cardId: string, columnId: string, updates: Partial<Pick<Card, 'title' | 'description'>>) => {
+    setError(null)
+
+    const previousColumns = columns
+    setColumns((prev) =>
+      prev.map((column) =>
+        column.id === columnId
+          ? {
+              ...column,
+              cards: (column.cards || []).map((card) => card.id === cardId ? { ...card, ...updates } : card),
+            }
+          : column
+      )
+    )
+
+    const res = await authFetch(`/api/boards/cards/${cardId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    })
+    const data = await res.json()
+
+    if (!res.ok || !data.success) {
+      setColumns(previousColumns)
+      throw new Error(data.message || 'Unable to update card')
+    }
+
+    const savedCard = normalizeCard(data.data as Card)
+    setColumns((prev) =>
+      prev.map((column) =>
+        column.id === columnId
+          ? {
+              ...column,
+              cards: (column.cards || []).map((card) => card.id === cardId ? { ...savedCard, labels: card.labels || [], comments: card.comments || [], attachments: card.attachments || [], checklists: card.checklists || [] } : card),
+            }
+          : column
+      )
+    )
+    return savedCard
+  }
+
   const getCardAttachments = async (cardId: string, columnId: string) => {
     setError(null)
 
@@ -499,7 +540,7 @@ export function useColumns(boardId: string) {
     })))
   }
 
-  return { columns, labels, isLoading, error, createColumn, createCard, moveCard, reorderColumns, deleteCard, createLabel, setCardLabels, setCardDueDate, getCardAttachments, uploadCardAttachment, deleteCardAttachment, getCardChecklists, createChecklist, deleteChecklist, createChecklistItem, updateChecklistItem, reorderChecklistItems, deleteChecklistItem }
+  return { columns, labels, isLoading, error, createColumn, createCard, moveCard, reorderColumns, deleteCard, createLabel, setCardLabels, setCardDueDate, updateCardDetails, getCardAttachments, uploadCardAttachment, deleteCardAttachment, getCardChecklists, createChecklist, deleteChecklist, createChecklistItem, updateChecklistItem, reorderChecklistItems, deleteChecklistItem }
 }
 
 function sortColumns(columns: Column[]) {

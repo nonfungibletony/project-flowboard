@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { DragDropContext, Draggable, Droppable, type DropResult } from '@hello-pangea/dnd'
 import { useParams } from 'react-router-dom'
 import type { Activity, Card, Column as ColumnType } from '@group/shared'
@@ -7,6 +7,7 @@ import { useBoard } from '../hooks/useBoard'
 import { useColumns } from '../hooks/useColumns'
 import { useAuthFetch } from '../hooks/useAuth'
 import { BOARD_BACKGROUNDS } from '../constants/boardBackgrounds'
+import { isTypingTarget } from '../utils/keyboard'
 
 export function Board() {
   const { boardId } = useParams()
@@ -32,9 +33,22 @@ export function Board() {
   const [settingsBackground, setSettingsBackground] = useState<string | null>(null)
   const [settingsError, setSettingsError] = useState<string | null>(null)
   const [isSavingSettings, setIsSavingSettings] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
+  const [focusedColumnId, setFocusedColumnId] = useState<string | null>(null)
+  const [focusedCard, setFocusedCard] = useState<Card | null>(null)
+  const [shortcutCardColumnId, setShortcutCardColumnId] = useState<string | null>(null)
+  const [shortcutCardTitle, setShortcutCardTitle] = useState('')
+  const [shortcutCardError, setShortcutCardError] = useState<string | null>(null)
+  const [isCreatingShortcutCard, setIsCreatingShortcutCard] = useState(false)
+  const [editCard, setEditCard] = useState<Card | null>(null)
+  const [editCardTitle, setEditCardTitle] = useState('')
+  const [editCardDescription, setEditCardDescription] = useState('')
+  const [editCardError, setEditCardError] = useState<string | null>(null)
+  const [isSavingEditCard, setIsSavingEditCard] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
   const authFetch = useAuthFetch()
   const { board, members, isLoading: boardLoading, error: boardError, inviteMember, removeMember, updateBoard } = useBoard(boardId!)
-  const { columns, labels, isLoading: columnsLoading, error, createColumn, createCard, moveCard, reorderColumns, deleteCard, createLabel, setCardLabels, setCardDueDate, getCardAttachments, uploadCardAttachment, deleteCardAttachment, getCardChecklists, createChecklist, deleteChecklist, createChecklistItem, updateChecklistItem, reorderChecklistItems, deleteChecklistItem } = useColumns(boardId!)
+  const { columns, labels, isLoading: columnsLoading, error, createColumn, createCard, moveCard, reorderColumns, deleteCard, createLabel, setCardLabels, setCardDueDate, updateCardDetails, getCardAttachments, uploadCardAttachment, deleteCardAttachment, getCardChecklists, createChecklist, deleteChecklist, createChecklistItem, updateChecklistItem, reorderChecklistItems, deleteChecklistItem } = useColumns(boardId!)
 
   const canEdit = board?.role === 'owner' || board?.role === 'editor'
   const isOwner = board?.role === 'owner'
@@ -74,6 +88,66 @@ export function Board() {
   useEffect(() => {
     setSettingsBackground(board?.backgroundColour || null)
   }, [board?.backgroundColour])
+
+  useEffect(() => {
+    if (!focusedColumnId && filteredColumns[0]) setFocusedColumnId(filteredColumns[0].id)
+  }, [focusedColumnId, filteredColumns])
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowShortcuts(false)
+        setShortcutCardColumnId(null)
+        setEditCard(null)
+        setShowActivity(false)
+        setShowSettings(false)
+        setShowAddColumn(false)
+        return
+      }
+
+      if (isTypingTarget(event.target)) return
+
+      if (event.key === '?') {
+        event.preventDefault()
+        setShowShortcuts(true)
+        return
+      }
+
+      if (event.key === '/' || ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k')) {
+        event.preventDefault()
+        searchInputRef.current?.focus()
+        return
+      }
+
+      if (!canEdit) return
+
+      if (event.key.toLowerCase() === 'c') {
+        event.preventDefault()
+        setShowAddColumn(true)
+        return
+      }
+
+      if (event.key.toLowerCase() === 'n') {
+        event.preventDefault()
+        const columnId = focusedColumnId || filteredColumns[0]?.id
+        if (columnId) {
+          setShortcutCardColumnId(columnId)
+          setShortcutCardTitle('')
+          setShortcutCardError(null)
+        }
+        return
+      }
+
+      if (event.key.toLowerCase() === 'e') {
+        event.preventDefault()
+        const card = focusedCard || findFirstCard(filteredColumns)
+        if (card) openEditCard(card)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [canEdit, filteredColumns, focusedCard, focusedColumnId])
 
   const handleCreateColumn = async () => {
     if (!newColumnName.trim()) return
@@ -161,6 +235,53 @@ export function Board() {
     }
   }
 
+  const handleCreateShortcutCard = async () => {
+    if (!shortcutCardColumnId || !shortcutCardTitle.trim()) return
+
+    setShortcutCardError(null)
+    setIsCreatingShortcutCard(true)
+
+    try {
+      const card = await createCard(shortcutCardColumnId, shortcutCardTitle.trim())
+      setFocusedCard(card)
+      loadActivities()
+      setShortcutCardColumnId(null)
+      setShortcutCardTitle('')
+    } catch (err) {
+      setShortcutCardError(err instanceof Error ? err.message : 'Unable to create card')
+    } finally {
+      setIsCreatingShortcutCard(false)
+    }
+  }
+
+  const openEditCard = (card: Card) => {
+    setEditCard(card)
+    setEditCardTitle(card.title)
+    setEditCardDescription(card.description || '')
+    setEditCardError(null)
+  }
+
+  const handleSaveEditCard = async () => {
+    if (!editCard || !editCardTitle.trim()) return
+
+    setEditCardError(null)
+    setIsSavingEditCard(true)
+
+    try {
+      const updated = await updateCardDetails(editCard.id, editCard.columnId, {
+        title: editCardTitle.trim(),
+        description: editCardDescription.trim(),
+      })
+      setFocusedCard(updated)
+      loadActivities()
+      setEditCard(null)
+    } catch (err) {
+      setEditCardError(err instanceof Error ? err.message : 'Unable to update card')
+    } finally {
+      setIsSavingEditCard(false)
+    }
+  }
+
   if (boardLoading || columnsLoading) return <p>Loading...</p>
 
   return (
@@ -219,6 +340,7 @@ export function Board() {
       <div className="board-filters">
         <div className="filter-row">
           <input
+            ref={searchInputRef}
             type="search"
             placeholder="Search cards"
             value={searchInput}
@@ -275,8 +397,15 @@ export function Board() {
                         labels={labels}
                         canEdit={canEdit}
                         canDrag={canEdit && !hasFilters}
+                        isFocused={focusedColumnId === column.id}
+                        focusedCardId={focusedCard?.id || null}
                         searchTerm={searchTerm}
                         columnDragHandleProps={dragProvided.dragHandleProps}
+                        onFocusColumn={() => setFocusedColumnId(column.id)}
+                        onFocusCard={(card) => {
+                          setFocusedColumnId(column.id)
+                          setFocusedCard(card)
+                        }}
                         onAddCard={async (title) => {
                           const card = await createCard(column.id, title)
                           loadActivities()
@@ -423,6 +552,69 @@ export function Board() {
           </div>
         </div>
       )}
+      {shortcutCardColumnId && (
+        <div className="modal-overlay" onClick={isCreatingShortcutCard ? undefined : () => setShortcutCardColumnId(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>New card</h2>
+            <input
+              type="text"
+              placeholder="Card title"
+              value={shortcutCardTitle}
+              onChange={(e) => setShortcutCardTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCreateShortcutCard()
+              }}
+              maxLength={500}
+              disabled={isCreatingShortcutCard}
+              autoFocus
+            />
+            {shortcutCardError && <p className="form-error">{shortcutCardError}</p>}
+            <div className="modal-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setShortcutCardColumnId(null)} disabled={isCreatingShortcutCard}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-primary" onClick={handleCreateShortcutCard} disabled={isCreatingShortcutCard || !shortcutCardTitle.trim()}>
+                {isCreatingShortcutCard ? 'Adding...' : 'Add'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {editCard && (
+        <div className="modal-overlay" onClick={isSavingEditCard ? undefined : () => setEditCard(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Edit card</h2>
+            <input
+              type="text"
+              placeholder="Card title"
+              value={editCardTitle}
+              onChange={(e) => setEditCardTitle(e.target.value)}
+              maxLength={500}
+              disabled={isSavingEditCard}
+              autoFocus
+            />
+            <textarea
+              placeholder="Description"
+              value={editCardDescription}
+              onChange={(e) => setEditCardDescription(e.target.value)}
+              maxLength={5000}
+              disabled={isSavingEditCard}
+            />
+            {editCardError && <p className="form-error">{editCardError}</p>}
+            <div className="modal-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setEditCard(null)} disabled={isSavingEditCard}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-primary" onClick={handleSaveEditCard} disabled={isSavingEditCard || !editCardTitle.trim()}>
+                {isSavingEditCard ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showShortcuts && (
+        <ShortcutHelp onClose={() => setShowShortcuts(false)} />
+      )}
       </div>
     </div>
   )
@@ -472,6 +664,14 @@ function cardMatchesFilters(card: Card, searchTerm: string, selectedLabelIds: st
   return true
 }
 
+function findFirstCard(columns: ColumnType[]) {
+  for (const column of columns) {
+    const card = column.cards?.[0] as Card | undefined
+    if (card) return card
+  }
+  return null
+}
+
 function formatActivity(activity: Activity) {
   const actor = activity.userName || 'Someone'
   const metadata = activity.metadata || {}
@@ -494,4 +694,37 @@ function formatActivity(activity: Activity) {
     default:
       return `${actor} performed ${activity.actionType}`
   }
+}
+
+function ShortcutHelp({ onClose }: { onClose: () => void }) {
+  const shortcuts = [
+    ['N', 'New card in focused column'],
+    ['C', 'New column'],
+    ['E', 'Edit focused card'],
+    ['/', 'Focus search'],
+    ['Cmd+K', 'Focus search'],
+    ['?', 'Show shortcuts'],
+    ['Esc', 'Close modal or cancel edit'],
+  ]
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal shortcut-modal" onClick={(e) => e.stopPropagation()}>
+        <h2>Keyboard shortcuts</h2>
+        <div className="shortcut-list">
+          {shortcuts.map(([keys, description]) => (
+            <div key={keys} className="shortcut-row">
+              <kbd>{keys}</kbd>
+              <span>{description}</span>
+            </div>
+          ))}
+        </div>
+        <div className="modal-actions">
+          <button type="button" className="btn btn-secondary" onClick={onClose}>
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }

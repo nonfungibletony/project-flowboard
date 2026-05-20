@@ -8,8 +8,12 @@ interface Props {
   labels: Label[]
   canEdit: boolean
   canDrag: boolean
+  isFocused: boolean
+  focusedCardId: string | null
   searchTerm: string
   columnDragHandleProps?: DraggableProvidedDragHandleProps | null
+  onFocusColumn: () => void
+  onFocusCard: (card: Card) => void
   onAddCard: (title: string) => Promise<unknown>
   onDeleteCard: (cardId: string) => Promise<unknown>
   onCreateLabel: (name: string, colour: string) => Promise<Label>
@@ -29,7 +33,7 @@ interface Props {
 
 const LABEL_COLOURS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899']
 
-export function Column({ column, labels, canEdit, canDrag, searchTerm, columnDragHandleProps, onAddCard, onDeleteCard, onCreateLabel, onSetCardLabels, onSetCardDueDate, onGetCardAttachments, onUploadCardAttachment, onDeleteCardAttachment, onGetCardChecklists, onCreateChecklist, onDeleteChecklist, onCreateChecklistItem, onUpdateChecklistItem, onReorderChecklistItems, onDeleteChecklistItem }: Props) {
+export function Column({ column, labels, canEdit, canDrag, isFocused, focusedCardId, searchTerm, columnDragHandleProps, onFocusColumn, onFocusCard, onAddCard, onDeleteCard, onCreateLabel, onSetCardLabels, onSetCardDueDate, onGetCardAttachments, onUploadCardAttachment, onDeleteCardAttachment, onGetCardChecklists, onCreateChecklist, onDeleteChecklist, onCreateChecklistItem, onUpdateChecklistItem, onReorderChecklistItems, onDeleteChecklistItem }: Props) {
   const [showAdd, setShowAdd] = useState(false)
   const [newCardTitle, setNewCardTitle] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -342,7 +346,7 @@ export function Column({ column, labels, canEdit, canDrag, searchTerm, columnDra
   }
 
   return (
-    <div className="column">
+    <div className={`column${isFocused ? ' column-focused' : ''}`} onClick={onFocusColumn}>
       <div className={`column-header${columnDragHandleProps ? ' column-header-draggable' : ''}`} {...columnDragHandleProps}>
         <h3>{column.name}</h3>
         <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
@@ -360,10 +364,14 @@ export function Column({ column, labels, canEdit, canDrag, searchTerm, columnDra
               <Draggable key={card.id} draggableId={card.id} index={index} isDragDisabled={!canDrag || card.id.startsWith('temp-')}>
                 {(dragProvided, dragSnapshot) => (
                   <div
-                    className={`card${dragSnapshot.isDragging ? ' card-dragging' : ''}`}
+                    className={`card${dragSnapshot.isDragging ? ' card-dragging' : ''}${focusedCardId === card.id ? ' card-focused' : ''}`}
                     ref={dragProvided.innerRef}
                     {...dragProvided.draggableProps}
                     {...dragProvided.dragHandleProps}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onFocusCard(card)
+                    }}
                   >
                     <div className="card-main">
                       <div>
