@@ -10,7 +10,10 @@ export const UserSchema = z.object({
 });
 
 export const CreateUserSchema = UserSchema.omit({ id: true, createdAt: true });
-export const UpdateUserSchema = CreateUserSchema.partial();
+export const UpdateUserSchema = CreateUserSchema.partial().refine(
+  (val) => Object.keys(val).length > 0,
+  { message: "At least one field must be provided for update" }
+);
 
 export type User = z.infer<typeof UserSchema>;
 export type CreateUser = z.infer<typeof CreateUserSchema>;
