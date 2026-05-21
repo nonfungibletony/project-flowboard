@@ -1,4 +1,4 @@
-import { serial, uuid, varchar, timestamp, pgTable, integer, text, foreignKey, jsonb } from "drizzle-orm/pg-core";
+import { serial, uuid, varchar, timestamp, pgTable, integer, text, foreignKey, jsonb, boolean } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -64,6 +64,21 @@ export const activities = pgTable("activities", {
   entityId: uuid("entity_id").notNull(),
   metadata: jsonb("metadata").default({}),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const checklists = pgTable("checklists", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  cardId: uuid("card_id").notNull().references(() => cards.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 200 }).notNull(),
+  order: integer("order").notNull().default(0),
+});
+
+export const checklistItems = pgTable("checklist_items", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  checklistId: uuid("checklist_id").notNull().references(() => checklists.id, { onDelete: "cascade" }),
+  content: varchar("content", { length: 500 }).notNull(),
+  completed: boolean("completed").default(false).notNull(),
+  order: integer("order").notNull().default(0),
 });
 
 export const workspaceMembers = pgTable("workspace_members", {

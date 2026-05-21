@@ -61,6 +61,34 @@ export type Column = z.infer<typeof ColumnSchema>;
 export type CreateColumn = z.infer<typeof CreateColumnSchema>;
 export type UpdateColumn = z.infer<typeof UpdateColumnSchema>;
 
+// Checklist (must be declared before Card)
+export const ChecklistItemSchema = z.object({
+  id: z.string().uuid(),
+  checklistId: z.string().uuid(),
+  content: z.string().min(1).max(500),
+  completed: z.boolean(),
+  order: z.number().int().min(0),
+});
+
+export const ChecklistSchema = z.object({
+  id: z.string().uuid(),
+  cardId: z.string().uuid(),
+  title: z.string().min(1).max(200),
+  order: z.number().int().min(0),
+  items: z.array(ChecklistItemSchema).optional(),
+});
+
+export const CreateChecklistSchema = ChecklistSchema.omit({ id: true, order: true, items: true });
+export const CreateChecklistItemSchema = ChecklistItemSchema.omit({ id: true, completed: true, order: true });
+export const UpdateChecklistItemSchema = z.object({
+  content: z.string().min(1).max(500).optional(),
+  completed: z.boolean().optional(),
+  order: z.number().int().min(0).optional(),
+});
+
+export type Checklist = z.infer<typeof ChecklistSchema>;
+export type ChecklistItem = z.infer<typeof ChecklistItemSchema>;
+
 // Card
 export const CardSchema = z.object({
   id: z.string().uuid(),
@@ -71,6 +99,7 @@ export const CardSchema = z.object({
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   comments: z.array(z.any()).optional(),
+  checklists: z.array(ChecklistSchema).optional(),
 });
 
 export const CreateCardSchema = CardSchema.omit({ id: true, order: true, createdAt: true, updatedAt: true, comments: true });

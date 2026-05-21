@@ -26,7 +26,7 @@ export function Board() {
   const [showActivity, setShowActivity] = useState(false)
 
   const { board, isLoading: boardLoading, updateBoard } = useBoard(boardId!)
-  const { columns, isLoading: columnsLoading, error, createColumn, createCard, updateCard: updateCardInColumns, addComment: addCommentInColumns, moveCard, reorderColumns, deleteColumn, deleteCard } = useColumns(boardId!)
+  const { columns, isLoading: columnsLoading, error, createColumn, createCard, updateCard: updateCardInColumns, addComment: addCommentInColumns, moveCard, reorderColumns, deleteColumn, deleteCard, loadChecklists, createChecklist, deleteChecklist, createChecklistItem, updateChecklistItem, deleteChecklistItem } = useColumns(boardId!)
   const { card, comments, isLoading: detailLoading, error: detailError, updateCard, addComment } = useCardDetail(selectedCardId)
   const { activities, isLoading: activityLoading, error: activityError } = useActivities(boardId!)
 
@@ -200,6 +200,12 @@ export function Board() {
             onUpdate={handleUpdateCard}
             onAddComment={handleAddComment}
             onDeleteCard={deleteCard}
+            onLoadChecklists={loadChecklists}
+            onCreateChecklist={createChecklist}
+            onDeleteChecklist={deleteChecklist}
+            onCreateChecklistItem={createChecklistItem}
+            onUpdateChecklistItem={updateChecklistItem}
+            onDeleteChecklistItem={deleteChecklistItem}
           />
         )}
 
