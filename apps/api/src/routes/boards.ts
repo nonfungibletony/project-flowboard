@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
-import { CreateBoardSchema, UpdateBoardSchema, CreateColumnSchema, CreateCardSchema, UpdateCardSchema, CreateCommentSchema } from "@group/shared";
+import { CreateBoardSchema, UpdateBoardSchema, CreateColumnSchema, CreateCardSchema, UpdateCardSchema, CreateCommentSchema, CreateChecklistSchema, CreateChecklistItemSchema, UpdateChecklistItemSchema } from "@group/shared";
 import { db, schema } from "@group/db";
-import { and, eq, desc } from "drizzle-orm";
+import { and, eq, desc, inArray } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
@@ -392,6 +392,96 @@ router.delete("/cards/:cardId", requireAuth, async (req: Request, res: Response)
     entityId: req.params.cardId,
     metadata: { cardTitle: card.title },
   });
+  res.json({ success: true });
+});
+
+router.get("/cards/:cardId/checklists", requireAuth, async (req: Request, res: Response) => {
+  const card = await getOwnedCard(req.params.cardId, req.user!.id);
+  if (!card) return res.status(404).json({ success: false, message: "Card not found" });
+
+  const checklists = await db.select().from(schema.checklists).where(eq(schema.checklists.cardId, req.params.cardId));
+  const checklistIds = checklists.map((c) => c.id);
+  const allItems = checklistIds.length
+    ? await db.select().from(schema.checklistItems).where(inArray(schema.checklistItems.checklistId, checklistIds))
+    : [];
+  const itemsByChecklist = new Map<string, typeof allItems>();
+  for (const item of allItems) {
+    itemsByChecklist.set(item.checklistId, [...(itemsByChecklist.get(item.checklistId) || []), item]);
+  }
+  const result = checklists.map((c) => ({
+    ...c,
+    items: (itemsByChecklist.get(c.id) || []).sort((a, b) => a.order - b.order),
+  })).sort((a, b) => a.order - b.order);
+
+  res.json({ success: true, data: result });
+});
+
+router.post("/cards/:cardId/checklists", requireAuth, async (req: Request, res: Response) => {
+  const card = await getOwnedCard(req.params.cardId, req.user!.id);
+  if (!card) return res.status(404).json({ success: false, message: "Card not found" });
+
+  const parsed = CreateChecklistSchema.safeParse({ ...req.body, cardId: req.params.cardId });
+  if (!parsed.success) {
+    return res.status(400).json({ success: false, message: parsed.error.message });
+  }
+  const existing = await db.select().from(schema.checklists).where(eq(schema.checklists.cardId, req.params.cardId));
+  const nextOrder = existing.reduce((max, c) => Math.max(max, c.order ?? 0), -1) + 1;
+  const inserted = await db.insert(schema.checklists).values({ ...parsed.data, order: nextOrder }).returning();
+  res.status(201).json({ success: true, data: { ...inserted[0], items: [] } });
+});
+
+router.post("/checklists/:checklistId/items", requireAuth, async (req: Request, res: Response) => {
+  const checklist = await db.select().from(schema.checklists).where(eq(schema.checklists.id, req.params.checklistId)).limit(1);
+  if (!checklist.length) return res.status(404).json({ success: false, message: "Checklist not found" });
+  const card = await getOwnedCard(checklist[0].cardId, req.user!.id);
+  if (!card) return res.status(404).json({ success: false, message: "Card not found" });
+
+  const parsed = CreateChecklistItemSchema.safeParse({ ...req.body, checklistId: req.params.checklistId });
+  if (!parsed.success) {
+    return res.status(400).json({ success: false, message: parsed.error.message });
+  }
+  const existing = await db.select().from(schema.checklistItems).where(eq(schema.checklistItems.checklistId, req.params.checklistId));
+  const nextOrder = existing.reduce((max, i) => Math.max(max, i.order ?? 0), -1) + 1;
+  const inserted = await db.insert(schema.checklistItems).values({ ...parsed.data, order: nextOrder }).returning();
+  res.status(201).json({ success: true, data: inserted[0] });
+});
+
+router.patch("/checklists/items/:itemId", requireAuth, async (req: Request, res: Response) => {
+  const item = await db.select().from(schema.checklistItems).where(eq(schema.checklistItems.id, req.params.itemId)).limit(1);
+  if (!item.length) return res.status(404).json({ success: false, message: "Item not found" });
+  const checklist = await db.select().from(schema.checklists).where(eq(schema.checklists.id, item[0].checklistId)).limit(1);
+  if (!checklist.length) return res.status(404).json({ success: false, message: "Checklist not found" });
+  const card = await getOwnedCard(checklist[0].cardId, req.user!.id);
+  if (!card) return res.status(404).json({ success: false, message: "Card not found" });
+
+  const parsed = UpdateChecklistItemSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ success: false, message: parsed.error.message });
+  }
+  const updated = await db.update(schema.checklistItems).set(parsed.data).where(eq(schema.checklistItems.id, req.params.itemId)).returning();
+  res.json({ success: true, data: updated[0] });
+});
+
+router.delete("/checklists/items/:itemId", requireAuth, async (req: Request, res: Response) => {
+  const item = await db.select().from(schema.checklistItems).where(eq(schema.checklistItems.id, req.params.itemId)).limit(1);
+  if (!item.length) return res.status(404).json({ success: false, message: "Item not found" });
+  const checklist = await db.select().from(schema.checklists).where(eq(schema.checklists.id, item[0].checklistId)).limit(1);
+  if (!checklist.length) return res.status(404).json({ success: false, message: "Checklist not found" });
+  const card = await getOwnedCard(checklist[0].cardId, req.user!.id);
+  if (!card) return res.status(404).json({ success: false, message: "Card not found" });
+
+  await db.delete(schema.checklistItems).where(eq(schema.checklistItems.id, req.params.itemId));
+  res.json({ success: true });
+});
+
+router.delete("/checklists/:checklistId", requireAuth, async (req: Request, res: Response) => {
+  const checklist = await db.select().from(schema.checklists).where(eq(schema.checklists.id, req.params.checklistId)).limit(1);
+  if (!checklist.length) return res.status(404).json({ success: false, message: "Checklist not found" });
+  const card = await getOwnedCard(checklist[0].cardId, req.user!.id);
+  if (!card) return res.status(404).json({ success: false, message: "Card not found" });
+
+  await db.delete(schema.checklistItems).where(eq(schema.checklistItems.checklistId, req.params.checklistId));
+  await db.delete(schema.checklists).where(eq(schema.checklists.id, req.params.checklistId));
   res.json({ success: true });
 });
 

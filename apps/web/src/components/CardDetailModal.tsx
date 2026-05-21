@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import type { Card, Comment } from '@group/shared'
+import type { Card, Comment, Checklist, ChecklistItem } from '@group/shared'
 
 interface Props {
   card: Card
@@ -10,9 +10,30 @@ interface Props {
   onUpdate: (updates: { title?: string; description?: string }) => Promise<void>
   onAddComment: (content: string) => Promise<void>
   onDeleteCard: (cardId: string) => Promise<void>
+  onLoadChecklists: (cardId: string, columnId: string) => Promise<Checklist[]>
+  onCreateChecklist: (cardId: string, columnId: string, title: string) => Promise<Checklist>
+  onDeleteChecklist: (cardId: string, columnId: string, checklistId: string) => Promise<void>
+  onCreateChecklistItem: (cardId: string, columnId: string, checklistId: string, content: string) => Promise<ChecklistItem>
+  onUpdateChecklistItem: (cardId: string, columnId: string, checklistId: string, itemId: string, updates: { content?: string; completed?: boolean }) => Promise<ChecklistItem>
+  onDeleteChecklistItem: (cardId: string, columnId: string, checklistId: string, itemId: string) => Promise<void>
 }
 
-export function CardDetailModal({ card, comments, isLoading, error, onClose, onUpdate, onAddComment, onDeleteCard }: Props) {
+export function CardDetailModal({
+  card,
+  comments,
+  isLoading,
+  error,
+  onClose,
+  onUpdate,
+  onAddComment,
+  onDeleteCard,
+  onLoadChecklists,
+  onCreateChecklist,
+  onDeleteChecklist,
+  onCreateChecklistItem,
+  onUpdateChecklistItem,
+  onDeleteChecklistItem,
+}: Props) {
   const [isEditing, setIsEditing] = useState(false)
   const [title, setTitle] = useState(card.title)
   const [description, setDescription] = useState(card.description || '')
@@ -23,19 +44,39 @@ export function CardDetailModal({ card, comments, isLoading, error, onClose, onU
   const [commentError, setCommentError] = useState<string | null>(null)
   const [isCommenting, setIsCommenting] = useState(false)
 
+  const [checklists, setChecklists] = useState<Checklist[]>(card.checklists || [])
+  const [checklistLoading, setChecklistLoading] = useState(false)
+  const [newChecklistTitle, setNewChecklistTitle] = useState('')
+  const [addingChecklist, setAddingChecklist] = useState(false)
+  const [newItemInputs, setNewItemInputs] = useState<Record<string, string>>({})
+  const [addingItem, setAddingItem] = useState<Record<string, boolean>>({})
+
   const overlayRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setTitle(card.title)
     setDescription(card.description || '')
-  }, [card.id, card.title, card.description])
+    setChecklists(card.checklists || [])
+  }, [card.id, card.title, card.description, card.checklists])
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus()
     }
   }, [isEditing])
+
+  useEffect(() => {
+    let mounted = true
+    if (!card.checklists?.length && !checklistLoading) {
+      setChecklistLoading(true)
+      onLoadChecklists(card.id, card.columnId)
+        .then((cls) => { if (mounted) setChecklists(cls) })
+        .catch(() => {})
+        .finally(() => { if (mounted) setChecklistLoading(false) })
+    }
+    return () => { mounted = false }
+  }, [card.id, card.columnId])
 
   const handleSave = async () => {
     if (!title.trim()) return
@@ -85,6 +126,83 @@ export function CardDetailModal({ card, comments, isLoading, error, onClose, onU
     }
   }
 
+  const handleAddChecklist = async () => {
+    if (!newChecklistTitle.trim()) return
+    setAddingChecklist(true)
+    try {
+      const cl = await onCreateChecklist(card.id, card.columnId, newChecklistTitle.trim())
+      setChecklists((prev) => [...prev, cl])
+      setNewChecklistTitle('')
+    } catch (err) {
+      setUpdateError(err instanceof Error ? err.message : 'Failed to add checklist')
+    } finally {
+      setAddingChecklist(false)
+    }
+  }
+
+  const handleDeleteChecklist = async (checklistId: string) => {
+    if (!window.confirm('Delete this checklist?')) return
+    try {
+      await onDeleteChecklist(card.id, card.columnId, checklistId)
+      setChecklists((prev) => prev.filter((c) => c.id !== checklistId))
+    } catch (err) {
+      setUpdateError(err instanceof Error ? err.message : 'Failed to delete checklist')
+    }
+  }
+
+  const handleAddItem = async (checklistId: string) => {
+    const content = newItemInputs[checklistId]?.trim()
+    if (!content) return
+    setAddingItem((prev) => ({ ...prev, [checklistId]: true }))
+    try {
+      const item = await onCreateChecklistItem(card.id, card.columnId, checklistId, content)
+      setChecklists((prev) =>
+        prev.map((cl) =>
+          cl.id === checklistId
+            ? { ...cl, items: [...(cl.items || []), item] }
+            : cl
+        )
+      )
+      setNewItemInputs((prev) => ({ ...prev, [checklistId]: '' }))
+    } catch (err) {
+      setUpdateError(err instanceof Error ? err.message : 'Failed to add item')
+    } finally {
+      setAddingItem((prev) => ({ ...prev, [checklistId]: false }))
+    }
+  }
+
+  const handleToggleItem = async (checklistId: string, item: ChecklistItem) => {
+    try {
+      const updated = await onUpdateChecklistItem(card.id, card.columnId, checklistId, item.id, {
+        completed: !item.completed,
+      })
+      setChecklists((prev) =>
+        prev.map((cl) =>
+          cl.id === checklistId
+            ? { ...cl, items: (cl.items || []).map((i) => (i.id === updated.id ? updated : i)) }
+            : cl
+        )
+      )
+    } catch (err) {
+      setUpdateError(err instanceof Error ? err.message : 'Failed to update item')
+    }
+  }
+
+  const handleDeleteItem = async (checklistId: string, itemId: string) => {
+    try {
+      await onDeleteChecklistItem(card.id, card.columnId, checklistId, itemId)
+      setChecklists((prev) =>
+        prev.map((cl) =>
+          cl.id === checklistId
+            ? { ...cl, items: (cl.items || []).filter((i) => i.id !== itemId) }
+            : cl
+        )
+      )
+    } catch (err) {
+      setUpdateError(err instanceof Error ? err.message : 'Failed to delete item')
+    }
+  }
+
   const formatTime = (dateStr: string) => {
     const d = new Date(dateStr)
     return d.toLocaleString(undefined, {
@@ -94,6 +212,15 @@ export function CardDetailModal({ card, comments, isLoading, error, onClose, onU
       minute: '2-digit',
     })
   }
+
+  const completedCount = checklists.reduce(
+    (sum, cl) => sum + (cl.items || []).filter((i) => i.completed).length,
+    0
+  )
+  const totalCount = checklists.reduce(
+    (sum, cl) => sum + (cl.items || []).length,
+    0
+  )
 
   return (
     <div
@@ -178,6 +305,93 @@ export function CardDetailModal({ card, comments, isLoading, error, onClose, onU
               ) : (
                 <p className="card-description-placeholder">No description</p>
               )}
+            </div>
+
+            <div className="card-detail-section">
+              <h4>
+                Checklists
+                {totalCount > 0 && (
+                  <span className="checklist-summary">
+                    {' '}
+                    ({completedCount}/{totalCount})
+                  </span>
+                )}
+              </h4>
+              {checklistLoading && <p className="checklist-loading">Loading checklists...</p>}
+              {checklists.map((cl) => (
+                <div key={cl.id} className="checklist-block">
+                  <div className="checklist-header">
+                    <span className="checklist-title">{cl.title}</span>
+                    <button
+                      className="btn btn-danger btn-small"
+                      onClick={() => handleDeleteChecklist(cl.id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                  <ul className="checklist-items">
+                    {(cl.items || []).map((item) => (
+                      <li key={item.id} className="checklist-item">
+                        <input
+                          type="checkbox"
+                          checked={item.completed}
+                          onChange={() => handleToggleItem(cl.id, item)}
+                        />
+                        <span className={item.completed ? 'checklist-item-done' : ''}>{item.content}</span>
+                        <button
+                          className="btn btn-danger btn-small checklist-item-delete"
+                          onClick={() => handleDeleteItem(cl.id, item.id)}
+                        >
+                          ×
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="checklist-add-item">
+                    <input
+                      type="text"
+                      placeholder="Add an item..."
+                      value={newItemInputs[cl.id] || ''}
+                      onChange={(e) =>
+                        setNewItemInputs((prev) => ({
+                          ...prev,
+                          [cl.id]: e.target.value,
+                        }))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleAddItem(cl.id)
+                      }}
+                      disabled={addingItem[cl.id]}
+                    />
+                    <button
+                      className="btn btn-primary btn-small"
+                      onClick={() => handleAddItem(cl.id)}
+                      disabled={addingItem[cl.id] || !newItemInputs[cl.id]?.trim()}
+                    >
+                      {addingItem[cl.id] ? '...' : 'Add'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <div className="checklist-add-block">
+                <input
+                  type="text"
+                  placeholder="New checklist title..."
+                  value={newChecklistTitle}
+                  onChange={(e) => setNewChecklistTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleAddChecklist()
+                  }}
+                  disabled={addingChecklist}
+                />
+                <button
+                  className="btn btn-primary btn-small"
+                  onClick={handleAddChecklist}
+                  disabled={addingChecklist || !newChecklistTitle.trim()}
+                >
+                  {addingChecklist ? '...' : 'Add Checklist'}
+                </button>
+              </div>
             </div>
 
             <div className="card-detail-section">

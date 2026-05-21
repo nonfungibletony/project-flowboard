@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import type { Card, Column } from '@group/shared'
+import type { Card, Column, Checklist, ChecklistItem } from '@group/shared'
 import { useAuthFetch, safeJson } from './useAuth'
 
 export function useColumns(boardId: string) {
@@ -205,7 +205,7 @@ function uuid(): string {
       throw new Error(data.message || 'Unable to move card')
     }
 
-    const savedCard = normalizeCard({ ...data.data, comments: movedCard.comments || [] } as Card)
+    const savedCard = normalizeCard({ ...data.data, comments: movedCard.comments || [], checklists: movedCard.checklists || [] } as Card)
     setColumns((prev) =>
       prev.map((column) =>
         column.id === targetColumnId
@@ -276,7 +276,184 @@ function uuid(): string {
     }
   }
 
-  return { columns, isLoading, error, createColumn, createCard, updateCard, addComment, moveCard, reorderColumns, deleteColumn, deleteCard }
+  const loadChecklists = async (cardId: string, columnId: string) => {
+    setError(null)
+    const res = await authFetch(`/api/boards/cards/${cardId}/checklists`)
+    const data = await safeJson(res)
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Unable to load checklists')
+    }
+    const checklists = (data.data || []) as Checklist[]
+    setColumns((prev) =>
+      prev.map((col) =>
+        col.id === columnId
+          ? {
+              ...col,
+              cards: (col.cards || []).map((card) =>
+                card.id === cardId ? { ...card, checklists } : card
+              ),
+            }
+          : col
+      )
+    )
+    return checklists
+  }
+
+  const createChecklist = async (cardId: string, columnId: string, title: string) => {
+    setError(null)
+    const res = await authFetch(`/api/boards/cards/${cardId}/checklists`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title }),
+    })
+    const data = await safeJson(res)
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Unable to create checklist')
+    }
+    const checklist = data.data as Checklist
+    setColumns((prev) =>
+      prev.map((col) =>
+        col.id === columnId
+          ? {
+              ...col,
+              cards: (col.cards || []).map((card) =>
+                card.id === cardId
+                  ? { ...card, checklists: [...(card.checklists || []), checklist] }
+                  : card
+              ),
+            }
+          : col
+      )
+    )
+    return checklist
+  }
+
+  const deleteChecklist = async (cardId: string, columnId: string, checklistId: string) => {
+    setError(null)
+    const res = await authFetch(`/api/boards/checklists/${checklistId}`, { method: 'DELETE' })
+    const data = await safeJson(res)
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Unable to delete checklist')
+    }
+    setColumns((prev) =>
+      prev.map((col) =>
+        col.id === columnId
+          ? {
+              ...col,
+              cards: (col.cards || []).map((card) =>
+                card.id === cardId
+                  ? { ...card, checklists: (card.checklists || []).filter((c: Checklist) => c.id !== checklistId) }
+                  : card
+              ),
+            }
+          : col
+      )
+    )
+  }
+
+  const createChecklistItem = async (cardId: string, columnId: string, checklistId: string, content: string) => {
+    setError(null)
+    const res = await authFetch(`/api/boards/checklists/${checklistId}/items`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    })
+    const data = await safeJson(res)
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Unable to add item')
+    }
+    const item = data.data as ChecklistItem
+    setColumns((prev) =>
+      prev.map((col) =>
+        col.id === columnId
+          ? {
+              ...col,
+              cards: (col.cards || []).map((card) =>
+                card.id === cardId
+                  ? {
+                      ...card,
+                      checklists: (card.checklists || []).map((cl: Checklist) =>
+                        cl.id === checklistId
+                          ? { ...cl, items: [...(cl.items || []), item] }
+                          : cl
+                      ),
+                    }
+                  : card
+              ),
+            }
+          : col
+      )
+    )
+    return item
+  }
+
+  const updateChecklistItem = async (cardId: string, columnId: string, checklistId: string, itemId: string, updates: { content?: string; completed?: boolean }) => {
+    setError(null)
+    const res = await authFetch(`/api/boards/checklists/items/${itemId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    })
+    const data = await safeJson(res)
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Unable to update item')
+    }
+    const item = data.data as ChecklistItem
+    setColumns((prev) =>
+      prev.map((col) =>
+        col.id === columnId
+          ? {
+              ...col,
+              cards: (col.cards || []).map((card) =>
+                card.id === cardId
+                  ? {
+                      ...card,
+                      checklists: (card.checklists || []).map((cl: Checklist) =>
+                        cl.id === checklistId
+                          ? { ...cl, items: (cl.items || []).map((i: ChecklistItem) => (i.id === itemId ? item : i)) }
+                          : cl
+                      ),
+                    }
+                  : card
+              ),
+            }
+          : col
+      )
+    )
+    return item
+  }
+
+  const deleteChecklistItem = async (cardId: string, columnId: string, checklistId: string, itemId: string) => {
+    setError(null)
+    const res = await authFetch(`/api/boards/checklists/items/${itemId}`, { method: 'DELETE' })
+    const data = await safeJson(res)
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Unable to delete item')
+    }
+    setColumns((prev) =>
+      prev.map((col) =>
+        col.id === columnId
+          ? {
+              ...col,
+              cards: (col.cards || []).map((card) =>
+                card.id === cardId
+                  ? {
+                      ...card,
+                      checklists: (card.checklists || []).map((cl: Checklist) =>
+                        cl.id === checklistId
+                          ? { ...cl, items: (cl.items || []).filter((i: ChecklistItem) => i.id !== itemId) }
+                          : cl
+                      ),
+                    }
+                  : card
+              ),
+            }
+          : col
+      )
+    )
+  }
+
+  return { columns, isLoading, error, createColumn, createCard, updateCard, addComment, moveCard, reorderColumns, deleteColumn, deleteCard, loadChecklists, createChecklist, deleteChecklist, createChecklistItem, updateChecklistItem, deleteChecklistItem }
 }
 
 function sortColumns(columns: Column[]) {
@@ -291,7 +468,7 @@ function normalizeColumn(column: Column) {
 }
 
 function normalizeCard(card: Card) {
-  return { ...card, comments: card.comments || [] }
+  return { ...card, comments: card.comments || [], checklists: card.checklists || [] }
 }
 
 function sortCards(cards: Card[]) {

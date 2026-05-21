@@ -986,3 +986,87 @@ body {
   font-size: 0.75rem;
   color: #6b7280;
 }
+
+/* ===== Card Checklists ===== */
+.checklist-summary {
+  font-size: 0.85rem;
+  color: #a1a1aa;
+  font-weight: 500;
+}
+
+.checklist-block {
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.checklist-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.checklist-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #e5e7eb;
+}
+
+.checklist-items {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.5rem 0;
+}
+
+.checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid #27272a;
+}
+
+.checklist-item:last-child {
+  border-bottom: none;
+}
+
+.checklist-item input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #3b82f6;
+  cursor: pointer;
+}
+
+.checklist-item-done {
+  text-decoration: line-through;
+  color: #6b7280;
+}
+
+.checklist-item-delete {
+  margin-left: auto;
+  padding: 0 0.4rem;
+  min-height: 1.5rem;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.checklist-add-item,
+.checklist-add-block {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.checklist-add-item input,
+.checklist-add-block input {
+  flex: 1;
+  min-width: 0;
+}
+
+.checklist-loading {
+  color: #a1a1aa;
+  font-size: 0.85rem;
+}
