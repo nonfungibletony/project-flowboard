@@ -92,6 +92,7 @@ export function Column({ column, index, onAddCard, onCardClick, onDeleteColumn }
           {showAdd ? (
             <div className="add-card-panel">
               <input
+                id={`new-card-input-${column.id}`}
                 type="text"
                 placeholder="Card title"
                 value={newCardTitle}
