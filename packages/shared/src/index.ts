@@ -25,13 +25,17 @@ export const BoardSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(500).optional(),
   archived: z.number().int().min(0).max(1),
+  backgroundColour: z.string().max(100).nullable().optional(),
   createdBy: z.string().uuid(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
 
-export const CreateBoardSchema = BoardSchema.omit({ id: true, createdBy: true, createdAt: true, updatedAt: true, archived: true });
-export const UpdateBoardSchema = CreateBoardSchema.partial().extend({ archived: z.number().int().min(0).max(1).optional() }).refine(
+export const CreateBoardSchema = BoardSchema.omit({ id: true, createdBy: true, createdAt: true, updatedAt: true, archived: true, backgroundColour: true });
+export const UpdateBoardSchema = CreateBoardSchema.partial().extend({
+  archived: z.number().int().min(0).max(1).optional(),
+  backgroundColour: z.string().max(100).nullable().optional(),
+}).refine(
   (val) => Object.keys(val).length > 0,
   { message: "At least one field must be provided for update" }
 );

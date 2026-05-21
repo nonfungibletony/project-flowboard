@@ -1,14 +1,16 @@
 import { useState, useCallback, useEffect } from 'react'
 import type { Board } from '@group/shared'
+import { BOARD_BACKGROUNDS } from '../constants/boardBackgrounds'
 
 interface Props {
   onClose: () => void
-  onCreate: (name: string, description?: string) => Promise<Board | null | undefined>
+  onCreate: (name: string, description?: string, backgroundColour?: string | null) => Promise<Board | null | undefined>
 }
 
 export function CreateBoardModal({ onClose, onCreate }: Props) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [backgroundColour, setBackgroundColour] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -42,10 +44,11 @@ export function CreateBoardModal({ onClose, onCreate }: Props) {
       setError(null)
       setIsSubmitting(true)
       try {
-        const created = await onCreate(name.trim(), description.trim() || undefined)
+        const created = await onCreate(name.trim(), description.trim() || undefined, backgroundColour)
         if (created) {
           setName('')
           setDescription('')
+          setBackgroundColour(null)
           onClose()
         } else {
           setError('Failed to create board. Please try again.')
@@ -56,7 +59,7 @@ export function CreateBoardModal({ onClose, onCreate }: Props) {
         setIsSubmitting(false)
       }
     },
-    [name, description, onCreate, onClose]
+    [name, description, backgroundColour, onCreate, onClose]
   )
 
   return (
@@ -105,6 +108,33 @@ export function CreateBoardModal({ onClose, onCreate }: Props) {
               rows={3}
               disabled={isSubmitting}
             />
+          </div>
+
+          <div className="form-group">
+            <label>Background</label>
+            <div className="background-picker">
+              <button
+                type="button"
+                className={`background-swatch${backgroundColour === null ? ' background-swatch-selected' : ''}`}
+                onClick={() => setBackgroundColour(null)}
+                disabled={isSubmitting}
+                aria-label="Use default background"
+              >
+                <span className="swatch-blank">Default</span>
+              </button>
+              {BOARD_BACKGROUNDS.map((bg) => (
+                <button
+                  key={bg.name}
+                  type="button"
+                  className={`background-swatch${backgroundColour === bg.value ? ' background-swatch-selected' : ''}`}
+                  style={{ background: bg.value }}
+                  onClick={() => setBackgroundColour(bg.value)}
+                  disabled={isSubmitting}
+                  aria-label={`Use ${bg.name} background`}
+                  title={bg.name}
+                />
+              ))}
+            </div>
           </div>
 
           {error && (

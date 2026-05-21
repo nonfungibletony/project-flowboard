@@ -7,7 +7,7 @@ interface UseBoardsResult {
   isLoading: boolean
   error: Error | null
   refresh: () => Promise<void>
-  createBoard: (name: string, description?: string) => Promise<Board | null>
+  createBoard: (name: string, description?: string, backgroundColour?: string | null) => Promise<Board | null>
   updateBoard: (id: string, updates: { name?: string; description?: string; archived?: number }) => Promise<void>
   deleteBoard: (id: string) => Promise<void>
   isCreating: boolean
@@ -59,9 +59,8 @@ export function useBoards(): UseBoardsResult {
     }
   }, [fetchBoards])
 
-  // Create a new board
   const createBoard = useCallback(
-    async (name: string, description?: string): Promise<Board | null> => {
+    async (name: string, description?: string, backgroundColour?: string | null): Promise<Board | null> => {
       if (!name.trim()) {
         setError(new Error('Board name is required'))
         return null
@@ -69,10 +68,12 @@ export function useBoards(): UseBoardsResult {
       setIsCreating(true)
       setError(null)
       try {
+        const body: Record<string, unknown> = { name: name.trim(), description: description?.trim() || undefined }
+        if (backgroundColour !== undefined) body.backgroundColour = backgroundColour
         const res = await authFetch('/api/boards', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name.trim(), description: description?.trim() || undefined }),
+          body: JSON.stringify(body),
         })
         const json = await safeJson(res)
         if (!res.ok) {
