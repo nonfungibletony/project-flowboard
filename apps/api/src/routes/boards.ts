@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { CreateBoardSchema, UpdateBoardSchema, CreateColumnSchema, CreateCardSchema, UpdateCardSchema, CreateCommentSchema } from "@group/shared";
 import { db, schema } from "@group/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
@@ -14,6 +14,24 @@ async function getOwnedBoard(boardId: string, userId: string) {
     .limit(1);
 
   return board[0] ?? null;
+}
+
+async function logActivity(input: {
+  boardId: string;
+  userId: string;
+  actionType: string;
+  entityType: string;
+  entityId: string;
+  metadata?: Record<string, unknown>;
+}) {
+  await db.insert(schema.activities).values({
+    boardId: input.boardId,
+    userId: input.userId,
+    actionType: input.actionType,
+    entityType: input.entityType,
+    entityId: input.entityId,
+    metadata: input.metadata || {},
+  });
 }
 
 async function getOwnedColumn(columnId: string, userId: string) {
@@ -70,6 +88,31 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
   res.json({ success: true, data: board });
 });
 
+router.get("/:id/activities", requireAuth, async (req: Request, res: Response) => {
+  const board = await getOwnedBoard(req.params.id, req.user!.id);
+  if (!board) return res.status(404).json({ success: false, message: "Board not found" });
+
+  const activities = await db
+    .select({
+      id: schema.activities.id,
+      boardId: schema.activities.boardId,
+      userId: schema.activities.userId,
+      actionType: schema.activities.actionType,
+      entityType: schema.activities.entityType,
+      entityId: schema.activities.entityId,
+      metadata: schema.activities.metadata,
+      createdAt: schema.activities.createdAt,
+      userName: schema.users.name,
+    })
+    .from(schema.activities)
+    .innerJoin(schema.users, eq(schema.activities.userId, schema.users.id))
+    .where(eq(schema.activities.boardId, req.params.id))
+    .orderBy(desc(schema.activities.createdAt))
+    .limit(50);
+
+  res.json({ success: true, data: activities });
+});
+
 router.patch("/:id", requireAuth, async (req: Request, res: Response) => {
   const parsed = UpdateBoardSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -118,6 +161,14 @@ router.post("/:id/columns", requireAuth, async (req: Request, res: Response) => 
     return res.status(400).json({ success: false, message: parsed.error.message });
   }
   const inserted = await db.insert(schema.columns).values({ ...parsed.data, order: nextOrder }).returning();
+  await logActivity({
+    boardId: req.params.id,
+    userId: req.user!.id,
+    actionType: 'created_column',
+    entityType: 'column',
+    entityId: inserted[0].id,
+    metadata: { columnName: inserted[0].name },
+  });
   res.status(201).json({ success: true, data: inserted[0] });
 });
 
@@ -131,6 +182,14 @@ router.patch("/columns/:columnId", requireAuth, async (req: Request, res: Respon
     .set({ name })
     .where(eq(schema.columns.id, req.params.columnId))
     .returning();
+  await logActivity({
+    boardId: column.boardId,
+    userId: req.user!.id,
+    actionType: 'updated_column',
+    entityType: 'column',
+    entityId: req.params.columnId,
+    metadata: { columnName: updated[0].name },
+  });
   res.json({ success: true, data: updated[0] });
 });
 
@@ -186,6 +245,14 @@ router.post("/columns/:columnId/cards", requireAuth, async (req: Request, res: R
     return res.status(400).json({ success: false, message: parsed.error.message });
   }
   const inserted = await db.insert(schema.cards).values({ ...parsed.data, order: nextOrder }).returning();
+  await logActivity({
+    boardId: column.boardId,
+    userId: req.user!.id,
+    actionType: 'created_card',
+    entityType: 'card',
+    entityId: inserted[0].id,
+    metadata: { cardTitle: inserted[0].title, columnName: column.name },
+  });
   res.status(201).json({ success: true, data: inserted[0] });
 });
 
@@ -217,6 +284,7 @@ router.patch("/cards/:cardId/move", requireAuth, async (req: Request, res: Respo
   }
 
   const updated = await db.update(schema.cards).set({ columnId, order }).where(eq(schema.cards.id, req.params.cardId)).returning();
+  const sourceColumn = await db.select().from(schema.columns).where(eq(schema.columns.id, card.columnId)).limit(1);
   if (Array.isArray(updates)) {
     for (const update of updates) {
       if (update.id === req.params.cardId) continue;
@@ -227,6 +295,18 @@ router.patch("/cards/:cardId/move", requireAuth, async (req: Request, res: Respo
     }
   }
 
+  await logActivity({
+    boardId: targetColumn.boardId,
+    userId: req.user!.id,
+    actionType: 'moved_card',
+    entityType: 'card',
+    entityId: req.params.cardId,
+    metadata: {
+      cardTitle: card.title,
+      sourceColumnName: sourceColumn[0]?.name || 'Unknown',
+      targetColumnName: targetColumn.name,
+    },
+  });
   res.json({ success: true, data: updated[0] });
 });
 
@@ -239,6 +319,15 @@ router.patch("/cards/:cardId", requireAuth, async (req: Request, res: Response) 
     return res.status(400).json({ success: false, message: parsed.error.message });
   }
   const updated = await db.update(schema.cards).set({ ...parsed.data, updatedAt: new Date() }).where(eq(schema.cards.id, req.params.cardId)).returning();
+  const cardColumn = await db.select({ boardId: schema.columns.boardId }).from(schema.columns).where(eq(schema.columns.id, card.columnId)).limit(1);
+  await logActivity({
+    boardId: cardColumn[0]?.boardId || '',
+    userId: req.user!.id,
+    actionType: 'updated_card',
+    entityType: 'card',
+    entityId: req.params.cardId,
+    metadata: { cardTitle: updated[0].title, changes: Object.keys(req.body) },
+  });
   res.json({ success: true, data: updated[0] });
 });
 
@@ -270,6 +359,15 @@ router.post("/cards/:cardId/comments", requireAuth, async (req: Request, res: Re
     return res.status(400).json({ success: false, message: parsed.error.message });
   }
   const inserted = await db.insert(schema.comments).values(parsed.data).returning();
+  const cardColumn = await db.select({ boardId: schema.columns.boardId }).from(schema.columns).where(eq(schema.columns.id, card.columnId)).limit(1);
+  await logActivity({
+    boardId: cardColumn[0]?.boardId || '',
+    userId: req.user!.id,
+    actionType: 'added_comment',
+    entityType: 'comment',
+    entityId: inserted[0].id,
+    metadata: { cardId: req.params.cardId, cardTitle: card.title, commentPreview: inserted[0].content?.slice(0, 100) || '' },
+  });
   res.status(201).json({ success: true, data: { ...inserted[0], userName: req.user!.name || "User" } });
 });
 
@@ -285,6 +383,15 @@ router.delete("/cards/:cardId", requireAuth, async (req: Request, res: Response)
   if (!card) return res.status(404).json({ success: false, message: "Card not found" });
 
   await db.delete(schema.cards).where(eq(schema.cards.id, req.params.cardId));
+  const cardColumn = await db.select({ boardId: schema.columns.boardId }).from(schema.columns).where(eq(schema.columns.id, card.columnId)).limit(1);
+  await logActivity({
+    boardId: cardColumn[0]?.boardId || '',
+    userId: req.user!.id,
+    actionType: 'deleted_card',
+    entityType: 'card',
+    entityId: req.params.cardId,
+    metadata: { cardTitle: card.title },
+  });
   res.json({ success: true });
 });
 
