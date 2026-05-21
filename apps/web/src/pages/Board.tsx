@@ -6,6 +6,7 @@ import { CardDetailModal } from '../components/CardDetailModal'
 import { useBoard } from '../hooks/useBoard'
 import { useColumns } from '../hooks/useColumns'
 import { useCardDetail } from '../hooks/useCardDetail'
+import { BOARD_BACKGROUNDS } from '../constants/boardBackgrounds'
 import type { Card } from '@group/shared'
 
 export function Board() {
@@ -16,8 +17,12 @@ export function Board() {
   const [isCreatingColumn, setIsCreatingColumn] = useState(false)
   const [moveError, setMoveError] = useState<string | null>(null)
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
+  const [showSettings, setShowSettings] = useState(false)
+  const [settingsBackground, setSettingsBackground] = useState<string | null>(null)
+  const [settingsError, setSettingsError] = useState<string | null>(null)
+  const [isSavingSettings, setIsSavingSettings] = useState(false)
 
-  const { board, isLoading: boardLoading } = useBoard(boardId!)
+  const { board, isLoading: boardLoading, updateBoard } = useBoard(boardId!)
   const { columns, isLoading: columnsLoading, error, createColumn, createCard, updateCard: updateCardInColumns, addComment: addCommentInColumns, moveCard, reorderColumns, deleteColumn, deleteCard } = useColumns(boardId!)
   const { card, comments, isLoading: detailLoading, error: detailError, updateCard, addComment } = useCardDetail(selectedCardId)
 
@@ -84,91 +89,156 @@ export function Board() {
     await addCommentInColumns(selectedCardId, content)
   }
 
+  const handleSaveSettings = async () => {
+    setSettingsError(null)
+    setIsSavingSettings(true)
+    try {
+      await updateBoard({ backgroundColour: settingsBackground })
+      setShowSettings(false)
+    } catch (err) {
+      setSettingsError(err instanceof Error ? err.message : 'Unable to update board')
+    } finally {
+      setIsSavingSettings(false)
+    }
+  }
+
   if (boardLoading || columnsLoading) return <p>Loading...</p>
 
   return (
-    <div className="container">
-      <div className="board-header">
-        <h1>{board?.name || 'Board'}</h1>
-        {board?.description && <p style={{ color: '#6b7280', marginTop: '0.25rem' }}>{board.description}</p>}
-      </div>
+    <div className="board-shell" style={{ background: board?.backgroundColour || undefined }}>
+      <div className="container">
+        <div className="board-header">
+          <div>
+            <h1>{board?.name || 'Board'}</h1>
+            {board?.description && <p style={{ color: '#6b7280', marginTop: '0.25rem' }}>{board.description}</p>}
+          </div>
+          <div className="board-header-actions">
+            <button className="btn btn-secondary" onClick={() => { setSettingsBackground(board?.backgroundColour || null); setShowSettings(true) }}>
+              Settings
+            </button>
+          </div>
+        </div>
 
-      {(error || moveError) && <p className="page-error">{moveError || error}</p>}
+        {(error || moveError) && <p className="page-error">{moveError || error}</p>}
 
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <Droppable droppableId="board" direction="horizontal" type="COLUMN">
-          {(boardProvided) => (
-            <div className="columns" ref={boardProvided.innerRef} {...boardProvided.droppableProps}>
-              {columns.map((column, index) => (
-                <Column
-                  key={column.id}
-                  column={column}
-                  index={index}
-                  onAddCard={(title) => createCard(column.id, title)}
-                  onCardClick={handleCardClick}
-                  onDeleteColumn={deleteColumn}
-                />
-              ))}
-              {boardProvided.placeholder}
-              {showAddColumn ? (
-                <div className="add-column-panel">
-                  <input
-                    type="text"
-                    placeholder="Column name"
-                    value={newColumnName}
-                    onChange={(e) => setNewColumnName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleCreateColumn()
-                      if (e.key === 'Escape') {
-                        setShowAddColumn(false)
-                        setNewColumnName('')
-                        setColumnError(null)
-                      }
-                    }}
-                    maxLength={200}
-                    disabled={isCreatingColumn}
-                    autoFocus
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <Droppable droppableId="board" direction="horizontal" type="COLUMN">
+            {(boardProvided) => (
+              <div className="columns" ref={boardProvided.innerRef} {...boardProvided.droppableProps}>
+                {columns.map((column, index) => (
+                  <Column
+                    key={column.id}
+                    column={column}
+                    index={index}
+                    onAddCard={(title) => createCard(column.id, title)}
+                    onCardClick={handleCardClick}
+                    onDeleteColumn={deleteColumn}
                   />
-                  {columnError && <p className="form-error">{columnError}</p>}
-                  <div className="inline-actions">
-                    <button className="btn btn-primary" onClick={handleCreateColumn} disabled={isCreatingColumn || !newColumnName.trim()}>
-                      {isCreatingColumn ? 'Adding...' : 'Add'}
-                    </button>
-                    <button
-                      className="btn btn-secondary"
-                      onClick={() => {
-                        setShowAddColumn(false)
-                        setNewColumnName('')
-                        setColumnError(null)
+                ))}
+                {boardProvided.placeholder}
+                {showAddColumn ? (
+                  <div className="add-column-panel">
+                    <input
+                      type="text"
+                      placeholder="Column name"
+                      value={newColumnName}
+                      onChange={(e) => setNewColumnName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleCreateColumn()
+                        if (e.key === 'Escape') {
+                          setShowAddColumn(false)
+                          setNewColumnName('')
+                          setColumnError(null)
+                        }
                       }}
+                      maxLength={200}
                       disabled={isCreatingColumn}
-                    >
-                      Cancel
-                    </button>
+                      autoFocus
+                    />
+                    {columnError && <p className="form-error">{columnError}</p>}
+                    <div className="inline-actions">
+                      <button className="btn btn-primary" onClick={handleCreateColumn} disabled={isCreatingColumn || !newColumnName.trim()}>
+                        {isCreatingColumn ? 'Adding...' : 'Add'}
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => {
+                          setShowAddColumn(false)
+                          setNewColumnName('')
+                          setColumnError(null)
+                        }}
+                        disabled={isCreatingColumn}
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <button className="add-column-btn" onClick={() => setShowAddColumn(true)}>
-                  + Add column
-                </button>
-              )}
-            </div>
-          )}
-        </Droppable>
-      </DragDropContext>
+                ) : (
+                  <button className="add-column-btn" onClick={() => setShowAddColumn(true)}>
+                    + Add column
+                  </button>
+                )}
+              </div>
+            )}
+          </Droppable>
+        </DragDropContext>
 
-      {selectedCardId && card && (
-        <CardDetailModal
-          card={card}
-          comments={comments}
-          isLoading={detailLoading}
-          error={detailError}
-          onClose={handleCloseModal}
-          onUpdate={handleUpdateCard}
-          onAddComment={handleAddComment}
-          onDeleteCard={deleteCard}
-        />
-      )}
+        {selectedCardId && card && (
+          <CardDetailModal
+            card={card}
+            comments={comments}
+            isLoading={detailLoading}
+            error={detailError}
+            onClose={handleCloseModal}
+            onUpdate={handleUpdateCard}
+            onAddComment={handleAddComment}
+            onDeleteCard={deleteCard}
+          />
+        )}
+
+        {showSettings && (
+          <div className="modal-overlay" onClick={isSavingSettings ? undefined : () => setShowSettings(false)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+              <h2>Board Settings</h2>
+              <div className="form-group">
+                <label>Background Colour</label>
+                <div className="background-picker">
+                  <button
+                    type="button"
+                    className={`background-swatch${settingsBackground === null ? ' background-swatch-selected' : ''}`}
+                    onClick={() => setSettingsBackground(null)}
+                    disabled={isSavingSettings}
+                    aria-label="Use default background"
+                  >
+                    <span className="swatch-blank">Default</span>
+                  </button>
+                  {BOARD_BACKGROUNDS.map((bg) => (
+                    <button
+                      key={bg.name}
+                      type="button"
+                      className={`background-swatch${settingsBackground === bg.value ? ' background-swatch-selected' : ''}`}
+                      style={{ background: bg.value }}
+                      onClick={() => setSettingsBackground(bg.value)}
+                      disabled={isSavingSettings}
+                      aria-label={`Use ${bg.name} background`}
+                      title={bg.name}
+                    />
+                  ))}
+                </div>
+              </div>
+              {settingsError && <p className="form-error">{settingsError}</p>}
+              <div className="modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowSettings(false)} disabled={isSavingSettings}>
+                  Cancel
+                </button>
+                <button type="button" className="btn btn-primary" onClick={handleSaveSettings} disabled={isSavingSettings}>
+                  {isSavingSettings ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

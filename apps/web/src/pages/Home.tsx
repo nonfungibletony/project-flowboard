@@ -8,8 +8,8 @@ export function Home() {
   const [showArchived, setShowArchived] = useState(false)
   const { boards, isLoading, error, refresh, createBoard, updateBoard, deleteBoard, isCreating } = useBoards()
 
-  const handleCreate = async (name: string, description?: string) => {
-    const result = await createBoard(name, description)
+  const handleCreate = async (name: string, description?: string, backgroundColour?: string | null) => {
+    const result = await createBoard(name, description, backgroundColour)
     return result
   }
 
