@@ -1,4 +1,4 @@
-import { serial, uuid, varchar, timestamp, pgTable, integer, text, foreignKey } from "drizzle-orm/pg-core";
+import { serial, uuid, varchar, timestamp, pgTable, integer, text, foreignKey, jsonb } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -52,6 +52,17 @@ export const comments = pgTable("comments", {
   cardId: uuid("card_id").notNull().references(() => cards.id, { onDelete: "cascade" }),
   userId: uuid("user_id").notNull().references(() => users.id),
   content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const activities = pgTable("activities", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  boardId: uuid("board_id").notNull().references(() => boards.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  actionType: varchar("action_type", { length: 50 }).notNull(),
+  entityType: varchar("entity_type", { length: 50 }).notNull(),
+  entityId: uuid("entity_id").notNull(),
+  metadata: jsonb("metadata").default({}),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

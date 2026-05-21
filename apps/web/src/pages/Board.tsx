@@ -6,6 +6,8 @@ import { CardDetailModal } from '../components/CardDetailModal'
 import { useBoard } from '../hooks/useBoard'
 import { useColumns } from '../hooks/useColumns'
 import { useCardDetail } from '../hooks/useCardDetail'
+import { useActivities } from '../hooks/useActivities'
+import { formatActivity } from '../utils/activityFormat'
 import { BOARD_BACKGROUNDS } from '../constants/boardBackgrounds'
 import type { Card } from '@group/shared'
 
@@ -21,10 +23,12 @@ export function Board() {
   const [settingsBackground, setSettingsBackground] = useState<string | null>(null)
   const [settingsError, setSettingsError] = useState<string | null>(null)
   const [isSavingSettings, setIsSavingSettings] = useState(false)
+  const [showActivity, setShowActivity] = useState(false)
 
   const { board, isLoading: boardLoading, updateBoard } = useBoard(boardId!)
   const { columns, isLoading: columnsLoading, error, createColumn, createCard, updateCard: updateCardInColumns, addComment: addCommentInColumns, moveCard, reorderColumns, deleteColumn, deleteCard } = useColumns(boardId!)
   const { card, comments, isLoading: detailLoading, error: detailError, updateCard, addComment } = useCardDetail(selectedCardId)
+  const { activities, isLoading: activityLoading, error: activityError } = useActivities(boardId!)
 
   const handleCreateColumn = async () => {
     if (!newColumnName.trim()) return
@@ -113,6 +117,9 @@ export function Board() {
             {board?.description && <p style={{ color: '#6b7280', marginTop: '0.25rem' }}>{board.description}</p>}
           </div>
           <div className="board-header-actions">
+            <button className="btn btn-secondary" onClick={() => setShowActivity(true)}>
+              Activity
+            </button>
             <button className="btn btn-secondary" onClick={() => { setSettingsBackground(board?.backgroundColour || null); setShowSettings(true) }}>
               Settings
             </button>
@@ -194,6 +201,34 @@ export function Board() {
             onAddComment={handleAddComment}
             onDeleteCard={deleteCard}
           />
+        )}
+
+        {showActivity && (
+          <div className="modal-overlay" onClick={() => setShowActivity(false)}>
+            <div className="modal activity-modal" onClick={(e) => e.stopPropagation()}>
+              <h2>Activity</h2>
+              {activityLoading && <p className="page-loading">Loading activity...</p>}
+              {activityError && <p className="form-error">{activityError}</p>}
+              {!activityLoading && !activityError && (
+                <ul className="activity-list">
+                  {activities.length === 0 && <li className="activity-empty">No activity yet.</li>}
+                  {activities.map((a) => (
+                    <li key={a.id} className="activity-item">
+                      <span className="activity-text">{formatActivity(a)}</span>
+                      <time className="activity-time" dateTime={a.createdAt}>
+                        {new Date(a.createdAt).toLocaleString()}
+                      </time>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowActivity(false)}>
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {showSettings && (

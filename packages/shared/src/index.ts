@@ -149,3 +149,18 @@ export const HealthCheckSchema = z.object({
 });
 
 export type HealthCheck = z.infer<typeof HealthCheckSchema>;
+
+// Activity
+export const ActivitySchema = z.object({
+  id: z.string().uuid(),
+  boardId: z.string().uuid(),
+  userId: z.string().uuid(),
+  userName: z.string().optional(),
+  actionType: z.string().min(1).max(50),
+  entityType: z.string().min(1).max(50),
+  entityId: z.string().uuid(),
+  metadata: z.record(z.unknown()).optional(),
+  createdAt: z.string().datetime(),
+});
+
+export type Activity = z.infer<typeof ActivitySchema>;
