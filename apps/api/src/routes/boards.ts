@@ -35,11 +35,21 @@ router.patch("/:id", requireAuth, async (req: Request, res: Response) => {
   if (!parsed.success) {
     return res.status(400).json({ success: false, message: parsed.error.message });
   }
+  const board = await db.select().from(schema.boards).where(eq(schema.boards.id, req.params.id)).limit(1);
+  if (!board.length) return res.status(404).json({ success: false, message: "Board not found" });
+  if (board[0].createdBy !== req.user!.id) {
+    return res.status(403).json({ success: false, message: "Forbidden: not the board owner" });
+  }
   const updated = await db.update(schema.boards).set(parsed.data).where(eq(schema.boards.id, req.params.id)).returning();
   res.json({ success: true, data: updated[0] });
 });
 
 router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
+  const board = await db.select().from(schema.boards).where(eq(schema.boards.id, req.params.id)).limit(1);
+  if (!board.length) return res.status(404).json({ success: false, message: "Board not found" });
+  if (board[0].createdBy !== req.user!.id) {
+    return res.status(403).json({ success: false, message: "Forbidden: not the board owner" });
+  }
   await db.delete(schema.boards).where(eq(schema.boards.id, req.params.id));
   res.json({ success: true });
 });

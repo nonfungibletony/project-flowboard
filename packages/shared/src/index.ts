@@ -10,7 +10,10 @@ export const UserSchema = z.object({
 });
 
 export const CreateUserSchema = UserSchema.omit({ id: true, createdAt: true });
-export const UpdateUserSchema = CreateUserSchema.partial();
+export const UpdateUserSchema = CreateUserSchema.partial().refine(
+  (val) => Object.keys(val).length > 0,
+  { message: "At least one field must be provided for update" }
+);
 
 export type User = z.infer<typeof UserSchema>;
 export type CreateUser = z.infer<typeof CreateUserSchema>;
@@ -27,7 +30,10 @@ export const BoardSchema = z.object({
 });
 
 export const CreateBoardSchema = BoardSchema.omit({ id: true, createdBy: true, createdAt: true, updatedAt: true });
-export const UpdateBoardSchema = CreateBoardSchema.partial();
+export const UpdateBoardSchema = CreateBoardSchema.partial().refine(
+  (val) => Object.keys(val).length > 0,
+  { message: "At least one field must be provided for update" }
+);
 
 export type Board = z.infer<typeof BoardSchema>;
 export type CreateBoard = z.infer<typeof CreateBoardSchema>;

@@ -22,14 +22,14 @@ export function useUserMe() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    authFetch('/me')
+    authFetch('/api/me')
       .then((r) => r.json())
       .then((data) => {
         if (data.success) setUser(data.data)
         setIsLoading(false)
       })
       .catch(() => setIsLoading(false))
-  }, [])
+  }, [authFetch])
 
   return { user, isLoading }
 }

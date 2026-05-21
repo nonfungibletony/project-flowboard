@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { CreateUserSchema, UpdateUserSchema } from "@group/shared";
 import { db, schema } from "@group/db";
 import { eq } from "drizzle-orm";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -10,7 +11,7 @@ router.get("/", async (_req: Request, res: Response) => {
   res.json({ success: true, data: users });
 });
 
-router.post("/", async (req: Request, res: Response) => {
+router.post("/", requireAuth, async (req: Request, res: Response) => {
   const parsed = CreateUserSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ success: false, message: parsed.error.message });
