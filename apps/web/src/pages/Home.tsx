@@ -1,12 +1,35 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { BoardCard } from '../components/BoardCard'
 import { CreateBoardModal } from '../components/CreateBoardModal'
+import { ShortcutHelpModal } from '../components/ShortcutHelpModal'
 import { useBoards } from '../hooks/useBoards'
+import { isTypingTarget } from '../utils/keyboard'
 
 export function Home() {
   const [showModal, setShowModal] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
   const { boards, isLoading, error, refresh, createBoard, updateBoard, deleteBoard, isCreating } = useBoards()
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target)) return
+      if (e.key === 'b' || e.key === 'B') {
+        e.preventDefault()
+        setShowModal(true)
+      }
+      if (e.key === '?') {
+        e.preventDefault()
+        setShowShortcuts(true)
+      }
+      if (e.key === 'Escape') {
+        setShowModal(false)
+        setShowShortcuts(false)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const handleCreate = async (name: string, description?: string, backgroundColour?: string | null) => {
     const result = await createBoard(name, description, backgroundColour)
@@ -79,6 +102,10 @@ export function Home() {
           onClose={() => setShowModal(false)}
           onCreate={handleCreate}
         />
+      )}
+
+      {showShortcuts && (
+        <ShortcutHelpModal onClose={() => setShowShortcuts(false)} />
       )}
     </div>
   )

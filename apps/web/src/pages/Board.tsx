@@ -1,14 +1,16 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { DragDropContext, Droppable, type DropResult } from '@hello-pangea/dnd'
 import { useParams } from 'react-router-dom'
 import { Column } from '../components/Column'
 import { CardDetailModal } from '../components/CardDetailModal'
+import { ShortcutHelpModal } from '../components/ShortcutHelpModal'
 import { useBoard } from '../hooks/useBoard'
 import { useColumns } from '../hooks/useColumns'
 import { useCardDetail } from '../hooks/useCardDetail'
 import { useActivities } from '../hooks/useActivities'
 import { formatActivity } from '../utils/activityFormat'
 import { BOARD_BACKGROUNDS } from '../constants/boardBackgrounds'
+import { isTypingTarget } from '../utils/keyboard'
 import type { Card } from '@group/shared'
 
 export function Board() {
@@ -24,6 +26,7 @@ export function Board() {
   const [settingsError, setSettingsError] = useState<string | null>(null)
   const [isSavingSettings, setIsSavingSettings] = useState(false)
   const [showActivity, setShowActivity] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
 
   const { board, isLoading: boardLoading, updateBoard } = useBoard(boardId!)
   const { columns, isLoading: columnsLoading, error, createColumn, createCard, updateCard: updateCardInColumns, addComment: addCommentInColumns, moveCard, reorderColumns, deleteColumn, deleteCard, loadChecklists, createChecklist, deleteChecklist, createChecklistItem, updateChecklistItem, deleteChecklistItem } = useColumns(boardId!)
@@ -105,6 +108,36 @@ export function Board() {
       setIsSavingSettings(false)
     }
   }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target)) return
+      if (e.key === 'n' || e.key === 'N') {
+        e.preventDefault()
+        setShowAddColumn(true)
+      }
+      if (e.key === 'c' || e.key === 'C') {
+        e.preventDefault()
+        const firstColumn = columns[0]
+        if (firstColumn) {
+          const cardInput = document.getElementById(`new-card-input-${firstColumn.id}`) as HTMLInputElement | null
+          if (cardInput) cardInput.focus()
+        }
+      }
+      if (e.key === '?') {
+        e.preventDefault()
+        setShowShortcuts(true)
+      }
+      if (e.key === 'Escape') {
+        setShowSettings(false)
+        setShowActivity(false)
+        setShowAddColumn(false)
+        setShowShortcuts(false)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [columns])
 
   if (boardLoading || columnsLoading) return <p>Loading...</p>
 
@@ -278,6 +311,10 @@ export function Board() {
               </div>
             </div>
           </div>
+        )}
+
+        {showShortcuts && (
+          <ShortcutHelpModal onClose={() => setShowShortcuts(false)} />
         )}
       </div>
     </div>
